@@ -1,0 +1,10 @@
+# python packages
+numpy
+pandas
+ipykernel
+
+# formatting
+black
+
+# testing
+pytest
