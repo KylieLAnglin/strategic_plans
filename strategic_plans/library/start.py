@@ -1,6 +1,6 @@
-MAIN_DIR = (
-    "/Users/kla21002/Library/CloudStorage/Dropbox/Active/Research/strategic_plans/"
-)
+HOME_DIR = "/Users/kla21002/"
+
+MAIN_DIR = HOME_DIR + "Library/CloudStorage/Dropbox/Active/Research/strategic_plans/"
 
 DATA_DIR = MAIN_DIR + "data/"
 RESULTS_DIR = MAIN_DIR + "results/"

@@ -6,7 +6,12 @@ from library import start
 # %%
 df = pd.read_csv(start.NATIONAL_DATA + "seda_ccd_covariates_2018.csv")
 # %%
-
+# %% Exclusions
+df = df[df.SY_STATUS_TEXT == "Open"]
+df = df[df.LEA_TYPE_TEXT.str.contains("Regular public school district")]
+df = df[df.NOGRADES == "No"]
+df = df[df.OPERATIONAL_SCHOOLS > 0]
+# %%
 
 df = df.dropna(subset=["locale", "census_division"])
 df["strata_string"] = df.census_division + " " + df.locale
