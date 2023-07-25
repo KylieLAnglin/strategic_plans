@@ -43,10 +43,18 @@ df._merge.value_counts()
 
 df = df[df._merge == "both"].drop("_merge", axis=1)
 
-
 # %% Clean and select CCD columns
 df = df.rename(
-    columns={"LEA_NAME": "lea_name", "ST": "state", "MZIP": "zip_code", "MCITY": "city"}
+    columns={
+        "LEA_NAME": "lea_name",
+        "ST": "state",
+        "MZIP": "zip_code",
+        "MCITY": "city",
+        "SY_STATUS_TEXT": "district_status",
+        "LEA_TYPE_TEXT": "district_type",
+        "NOGRADES": "district_no_grades",
+        "OPERATIONAL_SCHOOLS": "operational_schools",
+    }
 )
 df["zip_code"] = df.zip_code.astype(int)
 
@@ -90,7 +98,6 @@ df["random_number"] = df.randomization_string.apply(generate_random_number_from_
 df.drop("randomization_string", axis=1)
 # %% Export
 df = df[df.year == 2018]
-
 df.to_csv(start.DATA_DIR + "clean/seda_ccd_covariates_2018.csv", index=False)
 
 # %%
