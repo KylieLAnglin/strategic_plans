@@ -1,4 +1,4 @@
-# Stratic plans
+# Strategic plans
 
 ## File structure
 ____
