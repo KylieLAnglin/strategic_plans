@@ -1,7 +1,7 @@
 # %%
 import pandas as pd
 
-from library import start
+from strategic_plans.library import start
 
 df = pd.read_csv(start.DATA_DIR + "clean/seda_ccd_covariates_2018.csv")
 
