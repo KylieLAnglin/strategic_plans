@@ -44,6 +44,7 @@ characteristics = [
     "test_math_all_mean",
 ]
 
+df.to_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
 
 # %%
 # locations

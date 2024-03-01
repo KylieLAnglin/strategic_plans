@@ -3,20 +3,21 @@ import pandas as pd
 import re
 from strategic_plans.library import start
 
-# %%
-code_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Media_2023_11_10_1332.xls")
-code_df["district"] = (
-    code_df["Title"].str.rsplit("_", 1).str[0].str.replace(".pdf", "", regex=False)
-)
 
+# %%
+meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
+# %%
+FILENAME = "DedooseChartExcerpts_2024_3_1_1532.xlsx"
+code_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
+
+# %%
 codebook_df = pd.read_excel(
     start.MAIN_DIR + "data/raw/DedooseCodesExport_2023_11_10_1356.xlsx"
 )
-# List of patterns to be replaced with an underscore
-patterns = ["\s+", "-", ",+", "_+", "/+", "_"]
 
-# Joining the patterns into a single regex pattern
+patterns = ["\s+", "-", ",+", "_+", "/+", "_", r"\\"]
 regex_pattern = "|".join(patterns)
+
 codebook_df["code"] = codebook_df.Title.str.replace(regex_pattern, "_", regex=True)
 codebook_df["code"] = codebook_df.code.str.lower()
 codebook_df = codebook_df.set_index("Id")
@@ -31,21 +32,30 @@ for num in codebook_df.index:
 
 
 # %%
-characteristic_df = pd.read_csv(start.DATA_DIR + "clean/seda_ccd_covariates_2018.csv")
 
-df = characteristic_df.merge(
-    code_df, left_on="lea_name", right_on="district", indicator=True
+
+long_df = meta_data_df.merge(
+    code_df, left_on="dedoose_name", right_on="Media Title", indicator=True
 )
+long_df = long_df[long_df.plan_complete == 1]
 
 # %%
 # %%
-df.columns = [col.replace("Code: ", "code_").lower() for col in df.columns]
+long_df.columns = [col.replace("Code: ", "code_").lower() for col in long_df.columns]
 
 compiled_pattern = re.compile(regex_pattern)
-df.columns = [
-    compiled_pattern.sub("_", compiled_pattern.sub("_", col)) for col in df.columns
+long_df.columns = [
+    compiled_pattern.sub("_", compiled_pattern.sub("_", col)) for col in long_df.columns
 ]
-df.sample()
+long_df.sample()
+
+
+# %%
+codes = [col for col in long_df.columns if "code" in col]
+
+df = long_df[["leaid"] + codes].groupby("leaid").max()
+
+df.to_csv(start.MAIN_DIR + "data/clean/plans_codes.csv")
 # %%
 top_priority_df = df.replace({1: 0, 2: 0, 3: 1})
 top_priority_df[[col for col in top_priority_df if "code_" in col]].sum().sort_values(
