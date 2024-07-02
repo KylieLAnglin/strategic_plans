@@ -1,7 +1,7 @@
 # %%
 import pandas as pd
 import random
-from library import start
+from strategic_plans.library import start
 
 NATIONAL_DIR = (
     start.HOME_DIR + "Library/CloudStorage/Dropbox/Active/Research/national_data/data/"
@@ -43,22 +43,24 @@ df._merge.value_counts()
 
 df = df[df._merge == "both"].drop("_merge", axis=1)
 
-# %% Clean and select CCD columns
-df = df.rename(
-    columns={
-        "LEA_NAME": "lea_name",
-        "ST": "state",
-        "MZIP": "zip_code",
-        "MCITY": "city",
-        "SY_STATUS_TEXT": "district_status",
-        "LEA_TYPE_TEXT": "district_type",
-        "NOGRADES": "district_no_grades",
-        "OPERATIONAL_SCHOOLS": "operational_schools",
-    }
-)
+# %% Clean and select columns
+
+columns = {
+    "LEA_NAME": "lea_name",
+    "ST": "state",
+    "MZIP": "zip_code",
+    "MCITY": "city",
+    "SY_STATUS_TEXT": "district_status",
+    "LEA_TYPE_TEXT": "district_type",
+    "NOGRADES": "district_no_grades",
+    "OPERATIONAL_SCHOOLS": "operational_schools",
+}
+
+df = df.rename(columns=columns)
+# %%
 df["zip_code"] = df.zip_code.astype(int)
 
-columns_to_drop = [col for col in df.columns if col.isupper()]
+columns_to_drop = [col for col in df.columns if col not in columns.values()]
 df.drop(columns=columns_to_drop, inplace=True)
 
 

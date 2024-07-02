@@ -5,11 +5,8 @@ from strategic_plans.library import start
 import numpy as np
 
 # %%
-FILE = "plan_pdf_organization_Dec.'23.xlsx"
-SHEET = "Jan. Update"
 
-df = pd.read_excel(start.MAIN_DIR + FILE, sheet_name="Jan. Update")
-df
+df = pd.read_excel(start.MAIN_DIR + "plan_pdf_organization_May'24.xlsx")
 # %%
 columns = {
     "leadid": "leaid",

@@ -2,7 +2,7 @@
 import pandas as pd
 import re
 from strategic_plans.library import start
-
+import numpy as np
 
 # %%
 meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
@@ -54,6 +54,19 @@ long_df.sample()
 codes = [col for col in long_df.columns if "code" in col]
 
 df = long_df[["leaid"] + codes].groupby("leaid").max()
+
+# %% Hierarchical codes
+df["code_academic_achievement_and_proficiency_applied"] = np.where(
+    df.code_academic_achievement_and_proficiency_ap_courses_and_testing_applied == True,
+    True,
+    df.code_academic_achievement_and_proficiency_applied,
+)
+df["code_academic_achievement_and_proficiency_applied"] = np.where(
+    df.code_academic_achievement_and_proficiency_different_level_learners_applied
+    == True,
+    True,
+    df.code_academic_achievement_and_proficiency_applied,
+)
 
 df.to_csv(start.MAIN_DIR + "data/clean/plans_codes.csv")
 # %%
