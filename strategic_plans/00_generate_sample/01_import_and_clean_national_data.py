@@ -41,33 +41,50 @@ ccd["fips"] = ccd.fips.astype(int)
 df = ccd.merge(seda, left_on="leaid", right_on="leaid", how="outer", indicator="_merge")
 df._merge.value_counts()
 
+df[df._merge == "right_only"]["sedaleaname"].sample(10)
+df[df._merge == "right_only"]["LEA_NAME"].sample(10)
+# %%
 df = df[df._merge == "both"].drop("_merge", axis=1)
 
 # %% Clean and select columns
 
+df["zip_code"] = df.MZIP.astype(int)
+df["year"] = df.year.astype(int)
+df["locale"] = df[[col for col in df.columns if "locale_" in col]].idxmax(axis=1)
+df["urbanicity"] = df["locale"].str.extract("_(.*?)_")
+
+
 columns = {
     "LEA_NAME": "lea_name",
     "ST": "state",
-    "MZIP": "zip_code",
+    # "MZIP": "zip_code",
     "MCITY": "city",
     "SY_STATUS_TEXT": "district_status",
     "LEA_TYPE_TEXT": "district_type",
     "NOGRADES": "district_no_grades",
     "OPERATIONAL_SCHOOLS": "operational_schools",
+    "year": "year",
+    "locale": "locale",
+    "urbanicity": "urbanicity",
+    "zip_code": "zip_code",
+    "leaid": "leaid",
+    "perasn": "perasn",
+    "perblk": "perblk",
+    "perhsp": "perhsp",
+    "perfrl": "perfrl",
+    "perell": "perell",
+    "lninc50all": "lninc50all",
 }
 
 df = df.rename(columns=columns)
 # %%
-df["zip_code"] = df.zip_code.astype(int)
+# df["zip_code"] = df.zip_code.astype(int)
 
 columns_to_drop = [col for col in df.columns if col not in columns.values()]
 df.drop(columns=columns_to_drop, inplace=True)
 
 
 # %% Clean and generate columns
-df["year"] = df.year.astype(int)
-df["locale"] = df[[col for col in df.columns if "locale_" in col]].idxmax(axis=1)
-df["urbanicity"] = df["locale"].str.extract("_(.*?)_")
 
 
 df = df.merge(regions, how="left", left_on="state", right_on="State Code")

@@ -34,14 +34,14 @@ columns_to_keep = [
     "lea_name",
     "city",
     "locale",
+    "urbanicity",
     "census_division",
     "district_status",
     "district_type",
     "district_no_grades",
     "operational_schools",
-    "fips",
-    "fips_seda",
-    "sedaleaname",
+    "state_fips",
+    # "sedaleaname",
     "perasn",
     "perblk",
     "perhsp",
@@ -53,5 +53,5 @@ columns_to_keep = [
     "test_math_all_mean",
 ]
 
-df[columns_to_keep].to_csv(start.MAIN_DIR + "data/clean/seda_ccd_full.csv")
+df[columns_to_keep].to_csv(start.MAIN_DIR + "data/clean/seda_ccd_full.csv", index=False)
 # %%

@@ -15,14 +15,14 @@ df = df[df.operational_schools > 0]
 df = df[df._merge_academics == "both"]
 
 # %% Create strata
-df = df.dropna(subset=["locale", "census_division"])
-df["strata_string"] = df.census_division + " " + df.locale
+df = df.dropna(subset=["urbanicity", "census_division"])
+df["strata_string"] = df.census_division + " " + df.urbanicity
 df = df[df.strata_string != "nan"]
 
 # %% Keep first ten within strata
 df = df.sort_values(by=["strata_string", "random_number"])
 grouped = df.groupby("strata_string")
-df["strata_sample"] = grouped.cumcount() < 10
+df["strata_sample"] = grouped.cumcount() < 20
 df = df[df.strata_sample == True]
 
 # %% Clean and export
@@ -34,6 +34,7 @@ df = df[
         "lea_name",
         "city",
         "locale",
+        "urbanicity",
         "census_division",
         "random_number",
         "perblk",
@@ -42,9 +43,9 @@ df = df[
     ]
 ]
 
-df = df.sort_values(by=["census_division", "locale"])
+df = df.sort_values(by=["census_division", "urbanicity"])
 df.to_csv(
-    start.DATA_DIR + "clean/stratified_sample.csv",
+    start.DATA_DIR + "clean/stratified_sample_new.csv",
     index=False,
 )
 # %%
