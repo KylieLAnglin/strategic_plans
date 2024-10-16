@@ -4,12 +4,10 @@ import random
 
 from strategic_plans.library import start
 
-NATIONAL_DIR = (
-    start.HOME_DIR + "Library/CloudStorage/Dropbox/Active/Research/national_data/data/"
-)
+# %%
 
-RAW_SEDA = NATIONAL_DIR + "raw_from_SEDA/"
-RAW_CCD = NATIONAL_DIR + "raw_from_CCD/"
+RAW_SEDA = start.NATIONAL_DIR + "raw_from_SEDA/"
+RAW_CCD = start.NATIONAL_DIR + "raw_from_CCD/"
 
 CLEAN_DIR = start.MAIN_DIR + "data/clean/"
 codebook = pd.read_excel(start.MAIN_DIR + "data/seda_codebook.xlsx")
@@ -77,22 +75,3 @@ df = df.rename(columns={"district_id": "leaid"})
 df.to_csv(start.DATA_DIR + "clean/2018_seda_outcomes.csv", index=False)
 
 # %% Wide
-
-# years = [2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010, 2009]
-# for year in years:
-#     temp_df = df[df.year == year]
-#     temp_df = temp_df.set_index("district_id")
-#     temp_df = temp_df.add_suffix("_" + str(year))
-#     if year == 2018:
-#         wide_df = temp_df
-#     if year != 2018:
-#         wide_df = wide_df.merge(temp_df, left_index=True, right_index=True, how="outer")
-
-# # %%
-# # Create math df
-
-# # %%
-
-# wide_df.to_csv(CLEAN_DIR + "prepandemic_outcomes_wide.csv")
-
-# # %%

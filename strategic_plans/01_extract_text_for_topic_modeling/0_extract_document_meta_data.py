@@ -18,13 +18,14 @@ PRINTABLE = set(string.printable)
 # pip install "layoutparser[ocr]" # Install OCR toolkit
 # conda install -c conda-forge poppler
 
-DOWNLOAD_PATH = start.DATA_DIR + "raw/strategic_plan_downloads/"
+DOWNLOAD_PATH = start.MAIN_DIR + "downloaded_pdfs/"
 CSV_PATH = start.DATA_DIR + "raw/strategic_plan_csvs/"
-# %%
-district_df = pd.read_excel(start.DATA_DIR + "raw/stratified_sample_and_notes.xlsx")
 
 # %%
 list_documents = [f.name for f in os.scandir(DOWNLOAD_PATH)]
+
+# %% Create dataset of document meta-data
+
 documents = []
 for document in list_documents:
     new_document = {}
@@ -37,8 +38,6 @@ for document in list_documents:
         new_document["year"] = "Unknown"
     documents.append(new_document)
 meta_data_df = pd.DataFrame(documents)
-
-# %% Create dataset of document meta-data
 
 # %% Identify document types
 meta_data_df["file_type"] = meta_data_df.original_document_name.str[-4:]

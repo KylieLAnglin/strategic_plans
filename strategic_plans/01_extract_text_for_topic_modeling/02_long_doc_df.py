@@ -25,9 +25,11 @@ for filename in tqdm(filenames):
     temp_df = pd.read_csv(PATH + filename, header=0, sep="|")
     temp_df.text = temp_df.text.fillna(" ")
     temp_df.leaid = temp_df.district.fillna(value=0)
-
+    temp_df["pages"] = temp_df.page.max() + 1
     temp_df["text"] = temp_df["text"].astype(str)
-    temp_df = temp_df.groupby(["district"])["text"].apply(" ".join).reset_index()
+    temp_df = (
+        temp_df.groupby(["district", "pages"])["text"].apply(" ".join).reset_index()
+    )
     temp_df["filename"] = filename
     files.append(temp_df)
 
@@ -72,4 +74,10 @@ doc_df["text_lower"] = doc_df.text_clean.str.lower()  # already did this
 # %%
 # doc_df = pd.read_csv(start.DATA_DIR + "clean/documents_df.csv", sep="|")
 doc_df.to_csv(start.DATA_DIR + "clean/documents_df.csv", sep="|", index=False)
+
+check_pages = doc_df.sort_values(by="pages", ascending=False)
+check_pages[["district", "pages"]].to_excel(
+    start.MAIN_DIR + "pages_to_check.xlsx", index=False
+)
+
 # %%

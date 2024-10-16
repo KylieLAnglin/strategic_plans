@@ -3,20 +3,16 @@ import pandas as pd
 import random
 from strategic_plans.library import start
 
-NATIONAL_DIR = (
-    start.HOME_DIR + "Library/CloudStorage/Dropbox/Active/Research/national_data/data/"
-)
+RAW_SEDA = start.NATIONAL_DIR + "raw_from_SEDA/"
+RAW_CCD = start.NATIONAL_DIR + "raw_from_CCD/"
 
-RAW_SEDA = NATIONAL_DIR + "raw_from_SEDA/"
-RAW_CCD = NATIONAL_DIR + "raw_from_CCD/"
-
-CLEAN_DIR = NATIONAL_DIR + "clean/"
+CLEAN_DIR = start.NATIONAL_DIR + "clean/"
 
 # %%
 seda = pd.read_csv(RAW_SEDA + "seda_cov_geodist_poolyr_4.1.csv")
 ccd = pd.read_csv(RAW_CCD + "nonfiscal_district_2122_directory.csv")
-regions = pd.read_csv(NATIONAL_DIR + "us census bureau regions and divisions.csv")
-states = pd.read_csv(NATIONAL_DIR + "states.csv")
+regions = pd.read_csv(start.NATIONAL_DIR + "us census bureau regions and divisions.csv")
+states = pd.read_csv(start.NATIONAL_DIR + "states.csv")
 # %% Clean SEDA
 seda["leaid"] = seda.sedalea.fillna(0)
 seda["leaid"] = seda.leaid.astype(int)
@@ -37,7 +33,7 @@ ccd["fips"] = ccd.FIPST.fillna(0)
 ccd["fips"] = ccd.fips.astype(int)
 
 
-# %%
+# %% Merge SEDA and CCD
 df = ccd.merge(seda, left_on="leaid", right_on="leaid", how="outer", indicator="_merge")
 df._merge.value_counts()
 
