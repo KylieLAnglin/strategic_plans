@@ -10,8 +10,10 @@ from strategic_plans.library import start
 
 # %%
 PATH = start.DATA_DIR + "raw/strategic_plan_csvs/"
-
-meta_data_df = pd.read_csv(start.DATA_DIR + "clean/meta_data_df.csv")
+PATH = "/Users/kla21002/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/data/raw/strategic_plan_csvs/"
+meta_data_df = pd.read_csv(
+    "/Users/kla21002/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/data/clean/meta_data_df.csv"
+)
 
 # %%
 filenames = os.listdir(PATH)

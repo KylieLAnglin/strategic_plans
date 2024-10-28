@@ -17,9 +17,9 @@ PRINTABLE = set(string.printable)
 # pip install "layoutparser[layoutmodels]" # Install DL layout model toolkit
 # pip install "layoutparser[ocr]" # Install OCR toolkit
 # conda install -c conda-forge poppler
-
-DOWNLOAD_PATH = start.MAIN_DIR + "downloaded_pdfs/"
-CSV_PATH = start.DATA_DIR + "raw/strategic_plan_csvs/"
+PATH = "/Users/kla21002/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/"
+DOWNLOAD_PATH = PATH + "downloaded_pdfs/"
+CSV_PATH = "/Users/kla21002/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/data/raw/strategic_plan_csvs"
 
 # %%
 list_documents = [f.name for f in os.scandir(DOWNLOAD_PATH)]
@@ -64,7 +64,7 @@ docs_to_extract = meta_data_df[meta_data_df.document_csv_created == 0]
 meta_data_dict = docs_to_extract.to_dict("records")
 # %%
 
-meta_data_df.to_csv(start.DATA_DIR + "clean/meta_data_df.csv")
+meta_data_df.to_csv(PATH + "data/clean/meta_data_df.csv")
 # %%
 
 for document in tqdm(meta_data_dict):
