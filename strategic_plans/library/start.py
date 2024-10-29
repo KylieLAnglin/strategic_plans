@@ -3,7 +3,7 @@ HOME_DIR = "/Users/kla21002/"
 
 MAIN_DIR = (
     HOME_DIR
-    + "Library/CloudStorage/OneDrive-SharedLibraries-UniversityofConnecticut/strategic_plans - Documents/"
+    + "Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/"
 )
 
 DATA_DIR = MAIN_DIR + "data/"

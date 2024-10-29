@@ -17,34 +17,25 @@ PRINTABLE = set(string.printable)
 # pip install "layoutparser[layoutmodels]" # Install DL layout model toolkit
 # pip install "layoutparser[ocr]" # Install OCR toolkit
 # conda install -c conda-forge poppler
-PATH = "/Users/kla21002/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/"
-DOWNLOAD_PATH = PATH + "downloaded_pdfs/"
-CSV_PATH = "/Users/kla21002/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/data/raw/strategic_plan_csvs"
+DOWNLOAD_PATH = start.MAIN_DIR + "downloaded_pdfs/"
+CSV_PATH = start.DATA_DIR + "raw/strategic_plan_csvs/"
 
 # %%
 list_documents = [f.name for f in os.scandir(DOWNLOAD_PATH)]
 
-# %% Create dataset of document meta-data
+# %% Create dataset of document meta-data from pdf downloads
 
 documents = []
 for document in list_documents:
     new_document = {}
     new_document["original_document_name"] = document
-    try:
-        new_document["district"] = document.split("_")[0]
-        new_document["year"] = document.split("_")[1].split(".")[0]
-    except:
-        new_document["district"] = document.split(".")[0]
-        new_document["year"] = "Unknown"
+    new_document["district"] = document.replace(".pdf", "")
     documents.append(new_document)
 meta_data_df = pd.DataFrame(documents)
 
 # %% Identify document types
-meta_data_df["file_type"] = meta_data_df.original_document_name.str[-4:]
-
-meta_data_df = meta_data_df[
-    meta_data_df.file_type.isin([".pdf", ".doc", "docx", ".rtf", ".png"])
-]
+# meta_data_df["file_type"] = meta_data_df.original_document_name.str[-4:]
+# %%
 
 meta_data_df["filepath"] = DOWNLOAD_PATH + meta_data_df.original_document_name
 
@@ -64,7 +55,7 @@ docs_to_extract = meta_data_df[meta_data_df.document_csv_created == 0]
 meta_data_dict = docs_to_extract.to_dict("records")
 # %%
 
-meta_data_df.to_csv(PATH + "data/clean/meta_data_df.csv")
+meta_data_df.to_csv(start.DATA_DIR + "clean/meta_data_df.csv")
 # %%
 
 for document in tqdm(meta_data_dict):
