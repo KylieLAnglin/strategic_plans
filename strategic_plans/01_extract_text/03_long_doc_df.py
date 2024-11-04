@@ -72,3 +72,38 @@ check_pages[["district", "pages"]].to_excel(
 )
 
 # %%
+big_meta_df = meta_data_df.merge(
+    doc_df,
+    left_on="revised_name",
+    right_on="district",
+    how="outer",
+    indicator="_merge_meta",
+)
+# %%
+big_meta_df = big_meta_df[
+    [
+        "strata_string",
+        "leaid",
+        "state",
+        "lea_name",
+        "original_document_name",
+        "revised_name",
+        "city",
+        "locale",
+        "census_division",
+        "random_number",
+        "perblk",
+        "test_rla_all_mean",
+        "test_math_all_mean",
+        "pdf_downloaded",
+        "document_csv_created",
+        "filename",
+        "pages",
+        "ocr",
+        "text",
+        "contains_alphanumeric",
+        "failed_parse",
+        "complete_qual",
+    ]
+]
+# TODO: Update complete_qual in sample_inclusion

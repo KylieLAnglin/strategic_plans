@@ -21,7 +21,7 @@ CSV_PATH = start.DATA_DIR + "raw/strategic_plan_csvs/"
 
 # %%
 
-DOWNLOAD_PATH = start.MAIN_DIR + "downloaded_pdfs/"
+DOWNLOAD_PATH = start.MAIN_DIR + "final_pdfs/"
 sample_df = pd.read_excel(start.DATA_DIR + "sample_inclusion.xlsx")
 
 # %% Create dataset of document meta-data from pdf downloads
