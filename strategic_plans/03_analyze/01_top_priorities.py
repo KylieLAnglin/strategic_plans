@@ -6,8 +6,8 @@ from strategic_plans.library import start
 # %%
 
 df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_codes.csv")
-meta_data = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
-df = df.merge(meta_data, on="leaid")
+# meta_data = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
+# df = df.merge(meta_data, on="leaid")
 # %%
 codes = [col for col in df.columns if "applied" in col]
 

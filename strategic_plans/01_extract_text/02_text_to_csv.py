@@ -24,9 +24,7 @@ CSV_PATH = start.DATA_DIR + "raw/strategic_plan_csvs/"
 
 meta_data_df = pd.read_csv(start.DATA_DIR + "clean/meta_data_df.csv")
 # %%
-docs_to_extract = meta_data_df[
-    (meta_data_df.document_csv_created == 0) & (meta_data_df.pdf_downloaded == 1)
-]
+docs_to_extract = meta_data_df[(meta_data_df.document_csv_created == 0)]
 
 meta_data_dict = docs_to_extract.to_dict("records")
 

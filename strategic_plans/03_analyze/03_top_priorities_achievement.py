@@ -6,9 +6,8 @@ from strategic_plans.library import start
 
 # %%
 
-df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_codes.csv")
-meta_data = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
-df = df.merge(meta_data, on="leaid")
+df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_codes_characteristics.csv")
+
 df["high_achieving_rla"] = np.where(df.test_rla_all_mean >= 0.20, 1, 0)
 df["low_achieving_rla"] = np.where(df.test_rla_all_mean < 0.20, 1, 0)
 

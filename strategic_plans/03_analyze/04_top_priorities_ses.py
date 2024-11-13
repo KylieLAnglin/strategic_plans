@@ -6,7 +6,7 @@ from strategic_plans.library import start
 
 # %%
 
-df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_codes.csv")
+df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_codes_characteristics.csv")
 meta_data = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
 df = df.merge(meta_data, on="leaid")
 df["low_frpl"] = np.where(df.perfrl <= df.perfrl.quantile(0.25), 1, 0)

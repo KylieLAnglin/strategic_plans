@@ -41,7 +41,6 @@ doc_df = pd.concat(files, axis=0, ignore_index=True)
 print(len(files))
 print(doc_df.filename.nunique())
 # %%
-
 one_row_per_doc = doc_df[["district", "ocr"]].drop_duplicates()
 # doc_df = doc_df.merge(
 #     one_row_per_doc[["district", "ocr"]],
@@ -71,39 +70,47 @@ check_pages[["district", "pages"]].to_excel(
     start.MAIN_DIR + "pages_to_check.xlsx", index=False
 )
 
+doc_df = doc_df.drop(columns=["contains_alphanumeric"])
+
 # %%
-big_meta_df = meta_data_df.merge(
+big_meta_df = meta_data_df.drop(columns="district").merge(
     doc_df,
     left_on="revised_name",
     right_on="district",
-    how="outer",
+    how="left",
     indicator="_merge_meta",
 )
 # %%
-big_meta_df = big_meta_df[
-    [
-        "strata_string",
-        "leaid",
-        "state",
-        "lea_name",
-        "original_document_name",
-        "revised_name",
-        "city",
-        "locale",
-        "census_division",
-        "random_number",
-        "perblk",
-        "test_rla_all_mean",
-        "test_math_all_mean",
-        "pdf_downloaded",
-        "document_csv_created",
-        "filename",
-        "pages",
-        "ocr",
-        "text",
-        "contains_alphanumeric",
-        "failed_parse",
-        "complete_qual",
-    ]
-]
+# big_meta_df = big_meta_df[
+#     [
+#         "strata_string",
+#         "leaid",
+#         "state",
+#         "lea_name",
+#         "original_document_name",
+#         "revised_name",
+#         "city",
+#         "locale",
+#         "census_division",
+#         "random_number",
+#         "perblk",
+#         "test_rla_all_mean",
+#         "test_math_all_mean",
+#         "pdf_downloaded",
+#         "document_csv_created",
+#         "filename",
+#         "pages",
+#         "ocr",
+#         "text",
+#         "contains_alphanumeric",
+#         "failed_parse",
+#         "complete_qual",
+#         "include_qual",
+#     ]
+# ]
 # TODO: Update complete_qual in sample_inclusion
+
+# %%
+big_meta_df.to_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
+
+# %%

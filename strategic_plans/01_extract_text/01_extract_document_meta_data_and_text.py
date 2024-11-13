@@ -58,7 +58,18 @@ df = sample_df.merge(
 
 df["pdf_downloaded"] = np.where(df.pdf_downloaded == "both", 1, 0)
 df.pdf_downloaded.value_counts()
+df = df[df.pdf_downloaded == 1]
 # %%
-
+df = df.drop(
+    columns=[
+        "pdf_downloaded",
+        "need_to_qual",
+        "uploaded_dedoose",
+        "_merge",
+        "note",
+        "Unnamed: 20",
+        "Unnamed: 21",
+    ]
+)
 df.to_csv(start.DATA_DIR + "clean/meta_data_df.csv", index=False)
 # %%
