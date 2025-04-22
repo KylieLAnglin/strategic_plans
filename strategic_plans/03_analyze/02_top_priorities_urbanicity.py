@@ -5,9 +5,9 @@ from strategic_plans.library import start
 
 # %%
 
-df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_codes.csv")
-meta_data = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
-df = df.merge(meta_data, on="leaid")
+df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_codes_characteristics.csv")
+# meta_data = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
+# df = df.merge(meta_data, on="leaid")
 
 
 goal_count = pd.read_excel(start.MAIN_DIR + "results/goal_count.xlsx", index_col="goal")
