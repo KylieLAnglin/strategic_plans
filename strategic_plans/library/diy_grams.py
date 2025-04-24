@@ -1,9 +1,10 @@
 # %%
 import pandas as pd
+from strategic_plans.library import start
 
 # %%
 
-j_bgrams = pd.read_excel("diy_ngram_list_clean.xlsx")
+j_bgrams = pd.read_excel(start.DATA_DIR + "diy_ngram_list_clean.xlsx")
 # Convert the relevant column (e.g., 'diy_ngrams') to a Python list
 diy_bigrams = j_bgrams["diy_ngrams"].dropna().tolist()  # Drop any empty row
 diy_bigrams
