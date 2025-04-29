@@ -1,6 +1,6 @@
 # %%
 import pandas as pd
-import start
+from strategic_plans.library import start
 import pickle
 import numpy as np
 from tqdm import tqdm
@@ -8,7 +8,7 @@ from tqdm import tqdm
 SAMPLE = False
 SEED = 653
 
-with open(start.PATH + "data/clean/text_dfs.pkl", "rb") as file:
+with open(start.MAIN_DIR + "data/clean/text_dfs.pkl", "rb") as file:
     docs = pickle.load(file)
 
 
@@ -45,7 +45,7 @@ for idx, group_df in enumerate(final_groups):
             new_rows.append(
                 {
                     "decision_id": row.decision_id,
-                    "stop": row.stop,
+                    "remove_stop": row.remove_stop,
                     "diy_gram": row.diy_gram,
                     "stem": row.stem,
                     "tibigram": row.tribigram,
@@ -64,7 +64,7 @@ for idx, group_df in enumerate(final_groups):
                 new_rows.append(
                     {
                         "decision_id": row.decision_id,
-                        "stop": row.stop,
+                        "remove_stop": row.remove_stop,
                         "diy_gram": row.diy_gram,
                         "stem": row.stem,
                         "tibigram": row.tribigram,
@@ -87,7 +87,7 @@ for idx, group_df in enumerate(final_groups):
     print("Getting tokens....")
     new_group_df["tokens"] = new_group_df["text"].apply(lambda x: x.split())
 
-    output_path = start.PATH + f"data/clean/text_dfs_w_chunks_group_{idx + 1}.pkl"
+    output_path = start.MAIN_DIR + f"data/clean/text_dfs_w_chunks_group_{idx + 1}.pkl"
     new_group_df.to_pickle(output_path)
     print(f"Group {idx + 1} saved successfully with {len(new_group_df)} rows.")
 

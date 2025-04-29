@@ -27,8 +27,8 @@ documents_df["text_clean"] = documents_df.text.apply(
     lambda text: clean_text.basic_clean(
         text,
         remove_urls=True,
-        remove_unusual=True,
-        remove_numbers=True,
+        remove_unusual=False,
+        remove_numbers=False,
         remove_single_letters=False,
         remove_months=False,
     )
@@ -67,10 +67,8 @@ for param in tqdm(parameters_dicts, desc="Generating parameter-document combinat
         }
         records.append(record)
 
-# Convert to DataFrame
 processed_docs_df = pd.DataFrame(records)
 
-# Optional: reorder columns
 column_order = [
     "remove_stop",
     "diy_gram",
@@ -94,40 +92,55 @@ for idx, row in tqdm(processed_docs_df.iterrows()):
         processed_docs_df.at[idx, "text"] = diy_grams.add_grams(
             processed_docs_df.iloc[idx]["text"]
         )
-processed_docs_df.sample(5)
+processed_docs_df[processed_docs_df.diy_gram == 1].sample(5)
 
 # %%
 # tribigram
 print("Handling tribigrams")
-for original, gram in tqdm(zip(original_characters, grams)):
+for original, gram in tqdm(
+    zip(original_characters, grams), total=len(grams), desc="Processing tribigrams"
+):
     processed_docs_df.loc[processed_docs_df.tribigram == 1, "text"] = (
         processed_docs_df.loc[processed_docs_df.tribigram == 1, "text"].str.replace(
             original, gram
         )
     )
+processed_docs_df[processed_docs_df.tribigram == 1].sample(5)
+
+# %%
+# Advanced cleaning
+print("Handling advanced cleaning")
+processed_docs_df["text"] = processed_docs_df.text.apply(
+    lambda text: clean_text.basic_clean(
+        text,
+        remove_urls=False,
+        remove_unusual=False,
+        remove_numbers=False,
+        remove_single_letters=True,
+        remove_months=False,
+    )
+)
 processed_docs_df.sample(5)
+
 
 # %%
 print("Handling stopwords")
-for idx, row in processed_docs_df.iterrows():
+for idx, row in tqdm(processed_docs_df.iterrows()):
     if row["remove_stop"] == True:  # Check if stop is True
-        print("here")
         processed_docs_df.at[idx, "text"] = clean_text.remove_stopwords(row["text"])
-        print(processed_docs_df.at[idx, "text"])
-        stop
 processed_docs_df.sample(5)
 # %%
 
 # %%
 print("Handling stemming")
-for idx, row in processed_docs_df.iterrows():
+for idx, row in tqdm(processed_docs_df.iterrows()):
     if row["stem"] == True:  # Check if stem is True
         processed_docs_df.at[idx, "text"] = clean_text.lemmatize_text(row["text"])
 processed_docs_df.sample(5)
 
 # %%
 print("Handling min_df 5")
-for idx, row in processed_docs_df.iterrows():
+for idx, row in tqdm(processed_docs_df.iterrows()):
     if row["min_df"] == 5:
         processed_docs_df.at[idx, "text"] = clean_text.remove_infrequent_tokens(
             row["text"], tokens_to_keep_5
@@ -135,7 +148,7 @@ for idx, row in processed_docs_df.iterrows():
 
 # Handling min_df == 20
 print("Handling min_df 20")
-for idx, row in processed_docs_df.iterrows():
+for idx, row in tqdm(processed_docs_df.iterrows()):
     if row["min_df"] == 20:
         processed_docs_df.at[idx, "text"] = clean_text.remove_infrequent_tokens(
             row["text"], tokens_to_keep_20
@@ -144,5 +157,5 @@ for idx, row in processed_docs_df.iterrows():
 # %%
 
 # %%
-processed_docs_df.to_pickle(start.PATH + "data/clean/text_dfs_temp.pkl")
+processed_docs_df.to_pickle(start.DATA_DIR + "clean/text_dfs.pkl")
 # %%

@@ -38,7 +38,7 @@ def basic_clean(
         tokens = [word for word in tokens if not word.isdigit()]
 
     if remove_single_letters:
-        tokens = [token for token in tokens if len(token) > 1 or token == "a"]
+        tokens = [token for token in tokens if len(token) > 1]
 
     if remove_months:
         months = {
