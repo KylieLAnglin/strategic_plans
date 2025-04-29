@@ -15,7 +15,7 @@ from tqdm import tqdm
 from library import start
 from library import topic_modeling
 
-base_path = start.PATH + "results/"
+base_path = start.MAIN_DIR + "results/"
 
 # %%
 PASSES = 5

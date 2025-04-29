@@ -1,9 +1,9 @@
 # %%
 import pandas as pd
 import os
-from library import start
+from strategic_plans.library import start
 
-combos = pd.read_csv(start.PATH + "data/hyperparameters_models.csv")
+combos = pd.read_csv(start.DATA_DIR + "hyperparameters_models.csv")
 
 MAX_DFS = [1.0, 0.9, 0.7, 0.5]
 TOPICS = [10, 20, 30, 40, 50]
@@ -30,7 +30,7 @@ df = df[
         "chunk",
         "min_df",
         "max_df",
-        "stop",
+        "remove_stop",
         "diy_gram",
         "tribigram",
         "stem",
@@ -39,28 +39,45 @@ df = df[
 df.head()
 
 # %%
-# sample 10 rows from each unique topic value
+# stratify by topc
+# sample_models = (
+#     df.groupby(["topic"])
+#     .apply(lambda x: x.sample(10, random_state=1))
+#     .reset_index(drop=True)
+# )
+# no stratification
+# sample_models = df.sample(50, random_state=1)
+# stratify by topic and chunk size
 sample_models = (
-    df.groupby("topic")
-    .apply(lambda x: x.sample(10, random_state=1))
+    df.groupby(["topic", "chunk"])
+    .apply(lambda x: x.sample(3, random_state=1))
     .reset_index(drop=True)
 )
 sample_models = sample_models.sort_values(
-    by=["topic", "chunk", "min_df", "max_df", "stop", "diy_gram", "tribigram", "stem"]
+    by=[
+        "topic",
+        "chunk",
+        "min_df",
+        "max_df",
+        "remove_stop",
+        "diy_gram",
+        "tribigram",
+        "stem",
+    ]
 )
 sample_models.to_csv(start.DATA_DIR + "clean/sample_models.csv", index=False)
 
 # %%
 
 # list files in the data/clean directory
-files = os.listdir(start.PATH + "data/clean/")
+files = os.listdir(start.DATA_DIR + "clean/")
 files = [file for file in files if file.startswith("text_dfs_w_chunks_group")]
 
 # append to long dataframe
 dfs = []
 for file in files:
     group = file.split("_")[-1].split(".")[0]
-    df = pd.read_pickle(start.PATH + "data/clean/" + file)
+    df = pd.read_pickle(start.DATA_DIR + "clean/" + file)
     df = df.drop(["distict", "text", "chunk_number", "word_count", "tokens"], axis=1)
     df["group"] = group
     dfs.append(df)
@@ -93,7 +110,7 @@ all_parameters = all_parameters[
         "chunk",
         "min_df",
         "max_df",
-        "stop",
+        "remove_stop",
         "diy_gram",
         "tribigram",
         "stem",
