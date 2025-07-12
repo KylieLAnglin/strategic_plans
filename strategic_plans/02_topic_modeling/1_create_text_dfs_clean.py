@@ -115,9 +115,9 @@ processed_docs_df["text"] = processed_docs_df.text.apply(
         text,
         remove_urls=False,
         remove_unusual=False,
-        remove_numbers=False,
+        remove_numbers=True,
         remove_single_letters=True,
-        remove_months=False,
+        remove_months=True,
     )
 )
 processed_docs_df.sample(5)

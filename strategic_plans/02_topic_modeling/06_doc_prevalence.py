@@ -2,7 +2,7 @@
 import pandas as pd
 import numpy as np
 import os
-from library import start
+from strategic_plans.library import start
 
 docs = pd.read_csv(start.DATA_DIR + "clean/sample_documents_final.csv")
 districts = list(docs["district"].unique())

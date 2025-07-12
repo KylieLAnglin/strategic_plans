@@ -1,7 +1,7 @@
 # %%
 import numpy as np
 import pandas as pd
-from library import start
+from strategic_plans.library import start
 
 models = pd.read_csv(start.DATA_DIR + "clean/sample_models_coherence.csv")
 

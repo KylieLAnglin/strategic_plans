@@ -1,6 +1,6 @@
 # %%
 import pandas as pd
-from library import start
+from strategic_plans.library import start, topic_modeling
 import os
 
 df = pd.read_csv(start.RESULTS_DIR + "sample_doc_topic_prevalence_tfidf.csv")

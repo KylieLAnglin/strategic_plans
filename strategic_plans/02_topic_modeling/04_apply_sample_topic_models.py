@@ -12,8 +12,7 @@ from gensim.models import Phrases
 from gensim.corpora.dictionary import Dictionary
 from numpy import array
 from tqdm import tqdm
-from library import start
-from library import topic_modeling
+from strategic_plans.library import start, topic_modeling
 
 base_path = start.MAIN_DIR + "results/"
 
@@ -53,7 +52,7 @@ for model in models_list:
     # Import text matching processing decision in model
     group_num = model["text_group"]
     text_df = pd.read_pickle(
-        start.PATH + f"data/clean/text_dfs_w_chunks_group_{group_num}.pkl"
+        start.DATA_DIR + f"clean/text_dfs_w_chunks_group_{group_num}.pkl"
     )
     text_df = text_df[(text_df["decision_id"] == model["decision_id"])]
 
