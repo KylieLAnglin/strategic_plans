@@ -1,0 +1,6 @@
+README.md
+setup.py
+strategic_plans.egg-info/PKG-INFO
+strategic_plans.egg-info/SOURCES.txt
+strategic_plans.egg-info/dependency_links.txt
+strategic_plans.egg-info/top_level.txt
