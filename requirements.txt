@@ -2,6 +2,9 @@
 numpy
 pandas
 ipykernel
+scikit-learn
+statsmodels
+openpyxl
 
 # formatting
 black
