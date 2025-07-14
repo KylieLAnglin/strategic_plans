@@ -1,6 +1,8 @@
 # %%
 import pandas as pd
 import os
+from tqdm import tqdm
+
 from strategic_plans.library import start
 
 combos = pd.read_csv(start.DATA_DIR + "hyperparameters_models.csv")
@@ -74,18 +76,35 @@ files = os.listdir(start.DATA_DIR + "clean/")
 files = [file for file in files if file.startswith("text_dfs_w_chunks_group")]
 
 # append to long dataframe
-dfs = []
-for file in files:
+# dfs = []
+# for file in files:
+#     group = file.split("_")[-1].split(".")[0]
+#     df = pd.read_pickle(start.DATA_DIR + "clean/" + file)
+#     df = df.drop(["distict", "text", "chunk_number", "word_count", "tokens"], axis=1)
+#     df["group"] = group
+#     dfs.append(df)
+# text_dfs = pd.concat(dfs, ignore_index=True)
+# # %%
+# text_dfs["text_group"] = text_dfs["group"].astype(int)
+# text_dfs = text_dfs.drop("group", axis=1)
+# model_parameters = text_dfs.groupby(["decision_id", "text_group"]).mean().reset_index()
+
+# Create mapping without loading full pickle files
+decision_to_group = {}
+for file in tqdm(files):
     group = file.split("_")[-1].split(".")[0]
-    df = pd.read_pickle(start.DATA_DIR + "clean/" + file)
-    df = df.drop(["distict", "text", "chunk_number", "word_count", "tokens"], axis=1)
-    df["group"] = group
-    dfs.append(df)
-text_dfs = pd.concat(dfs, ignore_index=True)
-# %%
-text_dfs["text_group"] = text_dfs["group"].astype(int)
-text_dfs = text_dfs.drop("group", axis=1)
-model_parameters = text_dfs.groupby(["decision_id", "text_group"]).mean().reset_index()
+    # Load only the columns we need
+    df = pd.read_pickle(start.DATA_DIR + "clean/" + file)[["decision_id"]]
+    unique_decision_ids = df["decision_id"].unique()
+    
+    for decision_id in unique_decision_ids:
+        decision_to_group[decision_id] = int(group)
+
+# Convert to DataFrame
+model_parameters = pd.DataFrame(
+    list(decision_to_group.items()), 
+    columns=["decision_id", "text_group"]
+)
 
 sample_models_final = sample_models.merge(
     model_parameters[["decision_id", "text_group"]],
