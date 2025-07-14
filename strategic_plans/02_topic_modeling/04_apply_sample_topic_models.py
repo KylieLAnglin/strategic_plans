@@ -22,7 +22,6 @@ WORDS_TO_VIEW = 10
 SEED = 4205
 
 models = pd.read_csv(start.DATA_DIR + "clean/sample_models.csv")
-
 # %%
 
 # models as a list of dictionaries
@@ -57,7 +56,7 @@ for model in models_list:
     text_df = text_df[(text_df["decision_id"] == model["decision_id"])]
 
     text_df["doc_id"] = (
-        text_df.distict + "_chunk" + text_df.chunk.astype(int).astype(str)
+        text_df.district + "_chunk" + text_df.chunk.astype(int).astype(str)
     )
 
     # Create dictionary and corpus
