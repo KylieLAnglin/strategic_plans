@@ -5,7 +5,7 @@ import pandas as pd
 from strategic_plans.library import start
 
 # %%
-df_topics = pd.read_excel(start.MAIN_DIR + "data/sample_doc_topic_prevalence_with_words_rated.xlsx")
+df_topics = pd.read_excel(start.DATA_DIR + "narrow_models_round_2/sample_doc_topic_prevalence_with_words_rated.xlsx")
 
 # %%
 df = df_topics.groupby(["model_id", "district"]).mean(numeric_only=True).reset_index()
@@ -161,8 +161,4 @@ explained_variance_df.columns = ["decision", "explained_variance"]
 explained_variance_df = explained_variance_df.sort_values(
     by=["explained_variance"], ascending=False
 )
-# %%
-decisions = ["topic", "chunk", "diy_gram", "max_df", "min_df", "stem", "tribigram"]
-model_df = df.groupby(["model_id"] + decisions).mean(numeric_only=True).reset_index()
-model_df = model_df.sort_values(by=["model_quality"], ascending=False)
 # %%
