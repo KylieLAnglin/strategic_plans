@@ -10,6 +10,7 @@ models = pd.read_csv(start.DATA_DIR + "clean/sample_models_coherence.csv")
 
 # %%
 # Take mean prevalence of each topic for each district across chunks
+# This is doc_topics_grouped
 folders = os.listdir(start.RESULTS_DIR + "topic_models/")
 folders = [folder for folder in folders if folder != ".DS_Store"]
 folder = folders[0]
@@ -18,6 +19,7 @@ for folder in folders:
 
     # split doc_id into distinct and chunk
     df[["district", "chunk", "empty"]] = df["doc_id"].str.split("_", expand=True)
+    df = df.drop((["chunk", "empty", "text", "index", "doc_id"]), axis=1)
     df_grouped = df.groupby(["district"]).mean().reset_index()
     df_grouped.to_excel(
         start.RESULTS_DIR + "topic_models/" + folder + "/doc_topics_grouped.xlsx",
@@ -34,7 +36,7 @@ for folder in folders:
     )
     # limit to sample docs
     wide_df = wide_df[wide_df["district"].isin(districts)]
-    wide_df = wide_df.drop("index", axis=1)
+    # wide_df = wide_df.drop("index", axis=1)
 
     # make long with col for topic_number and prevalence
     long_df = pd.melt(

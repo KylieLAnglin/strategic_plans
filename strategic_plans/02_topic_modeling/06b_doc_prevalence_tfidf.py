@@ -16,12 +16,13 @@ folders = [folder for folder in folders if folder != ".DS_Store"]
 
 # %%
 topic_prevalence_idfs = []
+folder = folders[0]
 for folder in folders:
     # import topics from one model for all docs
     wide_df = pd.read_excel(
         start.RESULTS_DIR + "topic_models/" + folder + "/doc_topics_grouped.xlsx"
     )
-    wide_df = wide_df.drop(["index"], axis=1)
+    # wide_df = wide_df.drop(["index"], axis=1)
 
     # apply tf-idf weighting
     temp_df = wide_df.set_index("district")
