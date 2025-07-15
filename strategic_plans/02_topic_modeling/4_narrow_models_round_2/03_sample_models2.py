@@ -33,7 +33,8 @@ for topic in TOPICS:
 df = pd.DataFrame(all_combos)
 
 # rename index to model_id
-df["model_id"] = df.index
+df["model_id"] = 6262
+df["decision_id"] = 118.0
 
 # %%
 
@@ -132,6 +133,8 @@ sample_models_final = sample_models.merge(
 
 sample_models_final = sample_models_final.sort_values(
     by=[
+        "model_id",
+        "decision_id",
         "topic",
         "chunk",
         "min_df",
@@ -143,3 +146,5 @@ sample_models_final = sample_models_final.sort_values(
     ]
 )
 sample_models_final.to_csv(start.DATA_DIR + "narrow_models_round_2/sample_models.csv", index=False)
+
+# %%

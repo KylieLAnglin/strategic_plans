@@ -8,7 +8,7 @@ from strategic_plans.library import start
 df_topics = pd.read_excel(start.DATA_DIR + "narrow_models_round_2/sample_doc_topic_prevalence_with_words_rated.xlsx")
 
 # %%
-df = df_topics.groupby(["model_id", "district"]).mean(numeric_only=True).reset_index()
+df = df_topics.groupby(["model_id", "district", "topic"]).mean(numeric_only=True).reset_index()
 df = df.sort_values(by="document_order", ascending=False)
 
 df = df[df.model_quality.notna()]
@@ -162,3 +162,4 @@ explained_variance_df = explained_variance_df.sort_values(
     by=["explained_variance"], ascending=False
 )
 # %%
+# Decision: 23 topics

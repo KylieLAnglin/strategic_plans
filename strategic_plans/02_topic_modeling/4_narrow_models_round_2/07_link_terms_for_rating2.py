@@ -11,8 +11,12 @@ folders = [folder for folder in folders if folder != ".DS_Store"]
 
 topic_dfs = []
 for folder in folders:
-    model_id_str = folder.split("model")[1].split("topic")[1].split("_")[0]
+    model_id_str = folder.split("model")[1].split("topic")[0]
     model_id = int(round(float(model_id_str)))
+
+    topic_count_str = folder.split("model")[1].split("topic")[1].split("_")[0]
+    topic_count = int(round(float(topic_count_str)))
+
     wide_topic_df = pd.read_csv(
         start.DATA_DIR + "narrow_models_round_2/topic_models/" + folder + "/topics.csv"
     )
@@ -41,38 +45,43 @@ for folder in folders:
     prob_df["word_rank"] = prob_df.groupby("topic_number").cumcount() + 1
 
     topic_df = word_df.merge(prob_df, on=["topic_number", "word_rank"])
+    topic_df["topic"] = topic_count
     topic_df["model_id"] = model_id
-    topic_df = topic_df[["model_id", "topic_number", "word_rank", "word", "prob"]]
+    topic_df = topic_df[["model_id", "topic", "topic_number", "word_rank", "word", "prob"]]
     topic_dfs.append(topic_df)
 
 # %%
 
 big_topic_df = pd.concat(topic_dfs)
-big_topic_df = big_topic_df[["model_id", "topic_number", "word", "word_rank"]]
+big_topic_df = big_topic_df[["model_id", "topic", "topic_number", "word", "word_rank"]]
 
 # now long to wide with word1 word2 word3 word4 word5 columns
 big_topic_df = big_topic_df.pivot(
-    index=["model_id", "topic_number"], columns="word_rank", values="word"
+    index=["model_id", "topic", "topic_number"], columns="word_rank", values="word"
 )
 big_topic_df.columns = [f"word_{i}" for i in range(1, 11)]
 big_topic_df = big_topic_df.reset_index()
 
 
+# print duplicates by model_id topic topic_number
+duplicates = big_topic_df[big_topic_df.duplicated(subset=["model_id", "topic", "topic_number"], keep=False)]
+if not duplicates.empty:
+    print("Duplicates found in topic_df:")
+    print(duplicates)
 # %%
 
 # %%
-df = df.merge(big_topic_df, on=["model_id", "topic_number"])
+final_df = df.merge(big_topic_df, on=["model_id", "topic", "topic_number"], how="left")
 
 # %%
 
 sort_columns = [
     "document_order",
-    "model_id",
+    "topic",
     "prevalence",
-    "topic_number",
 ]
-df = df.sort_values(by=sort_columns, ascending=False)
-df.to_excel(
+final_df = final_df.sort_values(by=sort_columns, ascending=False)
+final_df.to_excel(
     start.DATA_DIR + "narrow_models_round_2/sample_doc_topic_prevalence_with_words.xlsx", index=False
 )
 

@@ -51,8 +51,11 @@ for folder in folders:
     model_id = int(folder.split("model")[1].split("topic")[0])
     long_df["model_id"] = model_id
 
-    # merge with model parameters
-    long_df = pd.merge(long_df, models, on="model_id")
+    # merge with model parameters - match on both model_id and topic count
+    topic_count_str = folder.split("topic")[1].split("_")[0]
+    topic_count = int(float(topic_count_str))
+    model_params = models[models["topic"] == topic_count]
+    long_df = pd.merge(long_df, model_params, on="model_id")
 
     topic_prevalence_dfs.append(long_df)
 
