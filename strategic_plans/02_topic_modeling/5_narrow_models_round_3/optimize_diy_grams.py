@@ -12,17 +12,17 @@ import pickle
 
 # Configuration for flexible parameter testing
 # Change PARAMETER_TO_TEST to test different parameters
-PARAMETER_TO_TEST = "max_df"  # Options: "max_df", "tribigram", "stem", etc.
+PARAMETER_TO_TEST = "diy_gram"  # Options: "max_df", "tribigram", "stem", "chunk", "min_df", "diy_gram", etc.
 
 # Base settings from round 2
 base_settings = {
     "topic": 23,
     "chunk": 150,
     "diy_gram": 0,
-    "max_df": 0.5,
+    "max_df": 0.4,
     "min_df": 5,
     "stem": 0,
-    "tribigram": 1,
+    "tribigram": 0,
     "remove_stop": 1
 }
 
@@ -32,7 +32,9 @@ parameter_options = {
     "tribigram": [0, 1],
     "stem": [0, 1],
     "diy_gram": [0, 1],
-    "remove_stop": [0, 1]
+    "remove_stop": [0, 1],
+    "chunk": [100, 125, 150, 175, 200],
+    "min_df": [5, 10, 15]
 }
 
 # Get current parameter values to test
@@ -50,6 +52,10 @@ def generate_model_id(param_dict, test_parameter):
         return f"diy_gram_{param_dict['diy_gram']}"
     elif test_parameter == "remove_stop":
         return f"remove_stop_{param_dict['remove_stop']}"
+    elif test_parameter == "chunk":
+        return f"chunk_{param_dict['chunk']}"
+    elif test_parameter == "min_df":
+        return f"min_df_{param_dict['min_df']}"
     else:
         return f"param_{param_dict[test_parameter]}"
 
@@ -100,11 +106,17 @@ documents_df["text_clean"] = documents_df.text.apply(
 )
 
 documents_df = documents_df[~documents_df.isnull()]
-tokens_to_keep_5 = clean_text.get_token_list(documents_df["text_clean"], min_df=base_settings["min_df"])
+
+# Use base settings min_df for token generation since we're testing diy_gram, not min_df
+tokens_to_keep = clean_text.get_token_list(documents_df["text_clean"], min_df=base_settings["min_df"])
+print(f"Generated {len(tokens_to_keep)} tokens for min_df={base_settings['min_df']}")
+
 grams = clean_text.generate_list_of_grams(
     documents_df=documents_df, text_col="text_clean"
 )
 original_characters = [gram.replace("_", " ") for gram in grams]
+
+print(f"Generated {len(grams)} grams for tribigram processing")
 
 # Prepare long-format records
 records = []
@@ -143,11 +155,31 @@ processed_docs_df = processed_docs_df[column_order]
 print(f"Final document count: {len(processed_docs_df)}")
 
 print("Handling DIY grams")
+diy_gram_rows = processed_docs_df[processed_docs_df.diy_gram == 1]
+print(f"Number of rows with diy_gram=1: {len(diy_gram_rows)}")
+
+if len(diy_gram_rows) > 0:
+    # Sample text before DIY gram processing
+    sample_text_before = processed_docs_df.loc[processed_docs_df.diy_gram == 1, "text"].iloc[0][:300]
+    print(f"Sample text before DIY gram processing: {sample_text_before}")
+
 for idx, row in tqdm(processed_docs_df.iterrows()):
     if row["diy_gram"]:
         processed_docs_df.at[idx, "text"] = diy_grams.add_grams(
             processed_docs_df.iloc[idx]["text"]
         )
+
+if len(diy_gram_rows) > 0:
+    # Sample text after DIY gram processing
+    sample_text_after = processed_docs_df.loc[processed_docs_df.diy_gram == 1, "text"].iloc[0][:300]
+    print(f"Sample text after DIY gram processing: {sample_text_after}")
+    
+    # Check if any DIY grams were actually created
+    sample_tokens = sample_text_after.split()
+    diy_gram_tokens = [token for token in sample_tokens if "_" in token and len(token.split("_")) > 1]
+    print(f"Found {len(diy_gram_tokens)} potential DIY gram tokens with underscores")
+    if diy_gram_tokens:
+        print(f"First 10 DIY gram tokens: {diy_gram_tokens[:10]}")
 
 print("Handling tribigrams")
 for original, gram in tqdm(
@@ -185,11 +217,29 @@ for idx, row in tqdm(processed_docs_df.iterrows()):
         processed_docs_df.at[idx, "text"] = clean_text.lemmatize_text(row["text"])
 processed_docs_df.sample(5)
 
-print("Handling min_df 5")
+# Generate tokens_to_keep AFTER DIY gram processing to include DIY grams in the token list
+print("Generating token list after DIY gram processing...")
+# Get sample text after DIY gram processing to generate proper token list
+sample_texts_after_diy_grams = processed_docs_df[processed_docs_df.diy_gram == 1]["text"].tolist()
+if not sample_texts_after_diy_grams:
+    sample_texts_after_diy_grams = processed_docs_df["text"].tolist()
+
+# Create a temporary dataframe with post-DIY-gram text for token list generation
+temp_df = pd.DataFrame({"text_clean": sample_texts_after_diy_grams})
+tokens_to_keep = clean_text.get_token_list(temp_df["text_clean"], min_df=base_settings["min_df"])
+print(f"Generated {len(tokens_to_keep)} tokens for min_df={base_settings['min_df']} (including DIY grams)")
+
+# Check if DIY grams are in the token list
+diy_gram_tokens_in_list = [token for token in tokens_to_keep if "_" in token and len(token.split("_")) > 1]
+print(f"Found {len(diy_gram_tokens_in_list)} DIY gram tokens in token list")
+if diy_gram_tokens_in_list:
+    print(f"Sample DIY gram tokens in keep list: {diy_gram_tokens_in_list[:15]}")
+
+print("Handling min_df filtering")
 for idx, row in tqdm(processed_docs_df.iterrows()):
-    if row["min_df"] == 5:
+    if row["min_df"] == base_settings["min_df"]:
         processed_docs_df.at[idx, "text"] = clean_text.remove_infrequent_tokens(
-            row["text"], tokens_to_keep_5
+            row["text"], tokens_to_keep
         )
 
 
@@ -237,6 +287,18 @@ new_docs_df["word_count"] = new_docs_df["text"].apply(lambda x: len(x.split()))
 
 print("Getting tokens....")
 new_docs_df["tokens"] = new_docs_df["text"].apply(lambda x: x.split())
+
+# Check for DIY grams in final tokens
+diy_gram_docs = new_docs_df[new_docs_df["diy_gram"] == 1]
+if len(diy_gram_docs) > 0:
+    sample_tokens = diy_gram_docs["tokens"].iloc[0]
+    diy_gram_tokens = [token for token in sample_tokens if "_" in token and len(token.split("_")) > 1]
+    print(f"Final tokens check - Found {len(diy_gram_tokens)} DIY gram tokens in sample")
+    if diy_gram_tokens:
+        print(f"Sample DIY gram tokens in final output: {diy_gram_tokens[:15]}")
+    else:
+        print("No DIY gram tokens found in final output!")
+        print(f"Sample final tokens: {sample_tokens[:20]}")
 
 new_docs_df.to_pickle(OUTPUT_CHUNK_DF)
 print(f"All docs processed and saved with {len(new_docs_df)} rows.")
@@ -329,8 +391,27 @@ for folder in folders:
     )
 
 # Create prevalence data
+print(f"Processing {len(folders)} folders: {folders}")
+print(f"Current parameter values being tested: {current_parameter_values}")
+print(f"Available model_ids in parameters: {list(parameters['model_id'])}")
+
 topic_prevalence_dfs = []
 for folder in folders:
+    # Extract model_id from folder name (e.g., "topic23_diy_gram_1" -> "diy_gram_1")
+    model_id = folder.split("topic")[1].split("_", 1)[1]
+    print(f"Processing folder: {folder} -> model_id: {model_id}")
+    
+    # Skip folders that don't match current parameter values being tested
+    param_value = model_id.split("_")[-1] if "_" in model_id else model_id
+    try:
+        param_value_int = int(param_value)
+        if param_value_int not in current_parameter_values:
+            print(f"Skipping folder {folder} (model_id: {model_id}) - not in current test values")
+            continue
+    except ValueError:
+        print(f"Could not parse parameter value from model_id: {model_id}")
+        continue
+    
     wide_df = pd.read_excel(
         output_dir + "topic_models/" + folder + "/doc_topics_grouped.xlsx"
     )
@@ -342,18 +423,15 @@ for folder in folders:
     long_df = long_df.sort_values(by=["district", "prevalence"], ascending=False)
     long_df = long_df.groupby("district").head(5)
     
-    # Extract model_id from folder name (e.g., "topic23_maxdf_0.5" -> "maxdf_0.5")
-    model_id = folder.split("topic")[1].split("_", 1)[1]
     long_df["model_id"] = model_id
     
     topic_count = int(folder.split("topic")[1].split("_")[0])
     model_params = parameters[parameters["model_id"] == model_id]
     if len(model_params) > 0:
         long_df = pd.merge(long_df, model_params, on="model_id")
+        topic_prevalence_dfs.append(long_df)
     else:
-        print(f"Warning: No parameters found for model_id {model_id}")
-    
-    topic_prevalence_dfs.append(long_df)
+        print(f"Warning: No parameters found for model_id {model_id} - skipping")
 
 topic_prevalence_df = pd.concat(topic_prevalence_dfs, ignore_index=True)
 final_df = topic_prevalence_df.merge(docs, on="district")
@@ -361,13 +439,21 @@ final_df = topic_prevalence_df.merge(docs, on="district")
 # Add topic words (following 07_link_terms_for_rating2.py pattern)
 topic_dfs = []
 for folder in folders:
-    # Extract model_id from folder name (e.g., "topic23_maxdf_0.5" -> "maxdf_0.5")
+    # Extract model_id from folder name (e.g., "topic23_diy_gram_1" -> "diy_gram_1")
     model_id = folder.split("topic")[1].split("_", 1)[1]
     
-    topic_count = int(folder.split("topic")[1].split("_")[0])
+    # Skip folders that don't match current parameter values being tested
+    param_value = model_id.split("_")[-1] if "_" in model_id else model_id
+    try:
+        param_value_int = int(param_value)
+        if param_value_int not in current_parameter_values:
+            print(f"Skipping folder {folder} (model_id: {model_id}) in topic words section - not in current test values")
+            continue
+    except ValueError:
+        print(f"Could not parse parameter value from model_id: {model_id} in topic words section")
+        continue
     
-    # Get the parameter value being tested
-    param_value = model_id.split("_")[1] if "_" in model_id else model_id
+    topic_count = int(folder.split("topic")[1].split("_")[0])
     wide_topic_df = pd.read_csv(
         output_dir + "topic_models/" + folder + "/topics.csv"
     )
@@ -396,7 +482,6 @@ for folder in folders:
     topic_dfs.append(topic_df)
 
 big_topic_df = pd.concat(topic_dfs)
-# problem: variation in big_topic_df is due to max_df but not included 
 big_topic_df = big_topic_df.pivot(
     index=["model_id", "topic", "topic_number", PARAMETER_TO_TEST], columns="word_rank", values="word"
 )
@@ -443,4 +528,4 @@ grouped_df = grouped_df.reset_index()
 grouped_df = grouped_df.sort_values(by=["model_quality_mean"], ascending=False)
 
 # %%
-# max_df = .4
+# DIY Gram = 1

@@ -8,18 +8,19 @@ import gensim
 from gensim.models.coherencemodel import CoherenceModel
 from gensim.models.ldamodel import LdaModel
 from gensim.corpora.dictionary import Dictionary
+from gensim.models.phrases import Phrases, Phraser, ENGLISH_CONNECTOR_WORDS
 import pickle
 
 # Configuration for flexible parameter testing
 # Change PARAMETER_TO_TEST to test different parameters
-PARAMETER_TO_TEST = "max_df"  # Options: "max_df", "tribigram", "stem", etc.
+PARAMETER_TO_TEST = "tribigram"  # Options: "max_df", "tribigram", "stem", "chunk", "min_df", etc.
 
 # Base settings from round 2
 base_settings = {
     "topic": 23,
     "chunk": 150,
     "diy_gram": 0,
-    "max_df": 0.5,
+    "max_df": 0.4,
     "min_df": 5,
     "stem": 0,
     "tribigram": 1,
@@ -32,11 +33,65 @@ parameter_options = {
     "tribigram": [0, 1],
     "stem": [0, 1],
     "diy_gram": [0, 1],
-    "remove_stop": [0, 1]
+    "remove_stop": [0, 1],
+    "chunk": [100, 125, 150, 175, 200],
+    "min_df": [5, 10, 15]
 }
 
 # Get current parameter values to test
 current_parameter_values = parameter_options[PARAMETER_TO_TEST]
+
+def generate_flexible_grams(documents_df, text_col, min_count=10, threshold=10, max_vocab_size=40000):
+    """
+    Generate bigrams and trigrams with flexible parameters
+    
+    Args:
+        documents_df: DataFrame containing text data
+        text_col: Column name containing text
+        min_count: Minimum frequency for phrases (default: 10, much lower than original 75)
+        threshold: Scoring threshold for phrase detection (default: 10, lower than original 30)
+        max_vocab_size: Maximum vocabulary size to prevent memory issues
+    
+    Returns:
+        List of detected phrases (bigrams and trigrams)
+    """
+    print(f"Generating grams with min_count={min_count}, threshold={threshold}")
+    
+    texts = documents_df[text_col].astype(str).apply(lambda x: x.split())
+    
+    # Generate bigrams with more permissive parameters
+    bigram = Phrases(
+        texts, 
+        min_count=min_count, 
+        threshold=threshold, 
+        connector_words=ENGLISH_CONNECTOR_WORDS,
+        max_vocab_size=max_vocab_size
+    )
+    bigram_phraser = Phraser(bigram)
+    
+    # Generate trigrams from bigram-processed texts
+    trigram = Phrases(
+        bigram_phraser[texts],
+        min_count=min_count,
+        threshold=threshold,
+        connector_words=ENGLISH_CONNECTOR_WORDS,
+        max_vocab_size=max_vocab_size
+    )
+    trigram_phraser = Phraser(trigram)
+    
+    # Get all detected phrases
+    grams = sorted(list(trigram_phraser.phrasegrams.keys()))
+    
+    print(f"Generated {len(grams)} total grams")
+    
+    # Separate bigrams and trigrams for analysis
+    bigrams = [gram for gram in grams if gram.count('_') == 1]
+    trigrams = [gram for gram in grams if gram.count('_') == 2]
+    
+    print(f"  - {len(bigrams)} bigrams")
+    print(f"  - {len(trigrams)} trigrams")
+    
+    return grams
 
 def generate_model_id(param_dict, test_parameter):
     """Generate a unique model_id based on the parameter being tested"""
@@ -50,6 +105,10 @@ def generate_model_id(param_dict, test_parameter):
         return f"diy_gram_{param_dict['diy_gram']}"
     elif test_parameter == "remove_stop":
         return f"remove_stop_{param_dict['remove_stop']}"
+    elif test_parameter == "chunk":
+        return f"chunk_{param_dict['chunk']}"
+    elif test_parameter == "min_df":
+        return f"min_df_{param_dict['min_df']}"
     else:
         return f"param_{param_dict[test_parameter]}"
 
@@ -100,11 +159,21 @@ documents_df["text_clean"] = documents_df.text.apply(
 )
 
 documents_df = documents_df[~documents_df.isnull()]
-tokens_to_keep_5 = clean_text.get_token_list(documents_df["text_clean"], min_df=base_settings["min_df"])
-grams = clean_text.generate_list_of_grams(
-    documents_df=documents_df, text_col="text_clean"
+
+# Use flexible gram generation with lower thresholds to get more bigrams/trigrams
+# You can adjust these parameters:
+# - min_count: how many times a phrase must appear (lower = more phrases)
+# - threshold: scoring threshold for phrase detection (lower = more permissive)
+grams = generate_flexible_grams(
+    documents_df=documents_df, 
+    text_col="text_clean",
+    min_count=5,    # Much lower than original 75
+    threshold=5     # Much lower than original 30
 )
 original_characters = [gram.replace("_", " ") for gram in grams]
+
+print(f"First 10 grams: {grams[:10]}")
+print(f"First 10 original characters: {original_characters[:10]}")
 
 # Prepare long-format records
 records = []
@@ -150,6 +219,13 @@ for idx, row in tqdm(processed_docs_df.iterrows()):
         )
 
 print("Handling tribigrams")
+tribigram_rows = processed_docs_df[processed_docs_df.tribigram == 1]
+print(f"Number of rows with tribigram=1: {len(tribigram_rows)}")
+
+if len(tribigram_rows) > 0:
+    sample_text_before = processed_docs_df.loc[processed_docs_df.tribigram == 1, "text"].iloc[0][:200]
+    print(f"Sample text before tribigram processing: {sample_text_before}")
+
 for original, gram in tqdm(
     zip(original_characters, grams), total=len(grams), desc="Processing tribigrams"
 ):
@@ -158,6 +234,17 @@ for original, gram in tqdm(
             original, gram
         )
     )
+
+if len(tribigram_rows) > 0:
+    sample_text_after = processed_docs_df.loc[processed_docs_df.tribigram == 1, "text"].iloc[0][:200]
+    print(f"Sample text after tribigram processing: {sample_text_after}")
+    
+    # Check if any tribigrams were actually created
+    sample_tokens = sample_text_after.split()
+    tribigram_tokens = [token for token in sample_tokens if "_" in token]
+    print(f"Found {len(tribigram_tokens)} tokens with underscores (tribigrams)")
+    if tribigram_tokens:
+        print(f"First 10 tribigram tokens: {tribigram_tokens[:10]}")
 
 # Advanced cleaning
 print("Handling advanced cleaning")
@@ -185,11 +272,29 @@ for idx, row in tqdm(processed_docs_df.iterrows()):
         processed_docs_df.at[idx, "text"] = clean_text.lemmatize_text(row["text"])
 processed_docs_df.sample(5)
 
-print("Handling min_df 5")
+# Generate tokens_to_keep AFTER tribigram processing to include tribigrams in the token list
+print("Generating token list after tribigram processing...")
+# Get sample text after tribigram processing to generate proper token list
+sample_texts_after_tribigrams = processed_docs_df[processed_docs_df.tribigram == 1]["text"].tolist()
+if not sample_texts_after_tribigrams:
+    sample_texts_after_tribigrams = processed_docs_df["text"].tolist()
+
+# Create a temporary dataframe with post-tribigram text for token list generation
+temp_df = pd.DataFrame({"text_clean": sample_texts_after_tribigrams})
+tokens_to_keep = clean_text.get_token_list(temp_df["text_clean"], min_df=base_settings["min_df"])
+print(f"Generated {len(tokens_to_keep)} tokens for min_df={base_settings['min_df']} (including tribigrams)")
+
+# Check if tribigrams are in the token list
+tribigram_tokens_in_list = [token for token in tokens_to_keep if "_" in token]
+print(f"Found {len(tribigram_tokens_in_list)} tribigram tokens in token list")
+if tribigram_tokens_in_list:
+    print(f"Sample tribigram tokens in keep list: {tribigram_tokens_in_list[:10]}")
+
+print("Handling min_df filtering")
 for idx, row in tqdm(processed_docs_df.iterrows()):
-    if row["min_df"] == 5:
+    if row["min_df"] == base_settings["min_df"]:
         processed_docs_df.at[idx, "text"] = clean_text.remove_infrequent_tokens(
-            row["text"], tokens_to_keep_5
+            row["text"], tokens_to_keep
         )
 
 
@@ -237,6 +342,18 @@ new_docs_df["word_count"] = new_docs_df["text"].apply(lambda x: len(x.split()))
 
 print("Getting tokens....")
 new_docs_df["tokens"] = new_docs_df["text"].apply(lambda x: x.split())
+
+# Check for tribigrams in final tokens
+tribigram_docs = new_docs_df[new_docs_df["tribigram"] == 1]
+if len(tribigram_docs) > 0:
+    sample_tokens = tribigram_docs["tokens"].iloc[0]
+    tribigram_tokens = [token for token in sample_tokens if "_" in token]
+    print(f"Final tokens check - Found {len(tribigram_tokens)} tribigram tokens in sample")
+    if tribigram_tokens:
+        print(f"Sample tribigram tokens in final output: {tribigram_tokens[:10]}")
+    else:
+        print("No tribigram tokens found in final output!")
+        print(f"Sample final tokens: {sample_tokens[:20]}")
 
 new_docs_df.to_pickle(OUTPUT_CHUNK_DF)
 print(f"All docs processed and saved with {len(new_docs_df)} rows.")
@@ -329,8 +446,27 @@ for folder in folders:
     )
 
 # Create prevalence data
+print(f"Processing {len(folders)} folders: {folders}")
+print(f"Current parameter values being tested: {current_parameter_values}")
+print(f"Available model_ids in parameters: {list(parameters['model_id'])}")
+
 topic_prevalence_dfs = []
 for folder in folders:
+    # Extract model_id from folder name (e.g., "topic23_tribigram_1" -> "tribigram_1")
+    model_id = folder.split("topic")[1].split("_", 1)[1]
+    print(f"Processing folder: {folder} -> model_id: {model_id}")
+    
+    # Skip folders that don't match current parameter values being tested
+    param_value = model_id.split("_")[-1] if "_" in model_id else model_id
+    try:
+        param_value_int = int(param_value)
+        if param_value_int not in current_parameter_values:
+            print(f"Skipping folder {folder} (model_id: {model_id}) - not in current test values")
+            continue
+    except ValueError:
+        print(f"Could not parse parameter value from model_id: {model_id}")
+        continue
+    
     wide_df = pd.read_excel(
         output_dir + "topic_models/" + folder + "/doc_topics_grouped.xlsx"
     )
@@ -342,18 +478,15 @@ for folder in folders:
     long_df = long_df.sort_values(by=["district", "prevalence"], ascending=False)
     long_df = long_df.groupby("district").head(5)
     
-    # Extract model_id from folder name (e.g., "topic23_maxdf_0.5" -> "maxdf_0.5")
-    model_id = folder.split("topic")[1].split("_", 1)[1]
     long_df["model_id"] = model_id
     
     topic_count = int(folder.split("topic")[1].split("_")[0])
     model_params = parameters[parameters["model_id"] == model_id]
     if len(model_params) > 0:
         long_df = pd.merge(long_df, model_params, on="model_id")
+        topic_prevalence_dfs.append(long_df)
     else:
-        print(f"Warning: No parameters found for model_id {model_id}")
-    
-    topic_prevalence_dfs.append(long_df)
+        print(f"Warning: No parameters found for model_id {model_id} - skipping")
 
 topic_prevalence_df = pd.concat(topic_prevalence_dfs, ignore_index=True)
 final_df = topic_prevalence_df.merge(docs, on="district")
@@ -361,13 +494,21 @@ final_df = topic_prevalence_df.merge(docs, on="district")
 # Add topic words (following 07_link_terms_for_rating2.py pattern)
 topic_dfs = []
 for folder in folders:
-    # Extract model_id from folder name (e.g., "topic23_maxdf_0.5" -> "maxdf_0.5")
+    # Extract model_id from folder name (e.g., "topic23_tribigram_1" -> "tribigram_1")
     model_id = folder.split("topic")[1].split("_", 1)[1]
     
-    topic_count = int(folder.split("topic")[1].split("_")[0])
+    # Skip folders that don't match current parameter values being tested
+    param_value = model_id.split("_")[-1] if "_" in model_id else model_id
+    try:
+        param_value_int = int(param_value)
+        if param_value_int not in current_parameter_values:
+            print(f"Skipping folder {folder} (model_id: {model_id}) in topic words section - not in current test values")
+            continue
+    except ValueError:
+        print(f"Could not parse parameter value from model_id: {model_id} in topic words section")
+        continue
     
-    # Get the parameter value being tested
-    param_value = model_id.split("_")[1] if "_" in model_id else model_id
+    topic_count = int(folder.split("topic")[1].split("_")[0])
     wide_topic_df = pd.read_csv(
         output_dir + "topic_models/" + folder + "/topics.csv"
     )
@@ -396,7 +537,6 @@ for folder in folders:
     topic_dfs.append(topic_df)
 
 big_topic_df = pd.concat(topic_dfs)
-# problem: variation in big_topic_df is due to max_df but not included 
 big_topic_df = big_topic_df.pivot(
     index=["model_id", "topic", "topic_number", PARAMETER_TO_TEST], columns="word_rank", values="word"
 )
@@ -443,4 +583,3 @@ grouped_df = grouped_df.reset_index()
 grouped_df = grouped_df.sort_values(by=["model_quality_mean"], ascending=False)
 
 # %%
-# max_df = .4

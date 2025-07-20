@@ -12,14 +12,14 @@ import pickle
 
 # Configuration for flexible parameter testing
 # Change PARAMETER_TO_TEST to test different parameters
-PARAMETER_TO_TEST = "max_df"  # Options: "max_df", "tribigram", "stem", etc.
+PARAMETER_TO_TEST = "min_df"  # Options: "max_df", "tribigram", "stem", "chunk", "min_df", etc.
 
 # Base settings from round 2
 base_settings = {
     "topic": 23,
     "chunk": 150,
     "diy_gram": 0,
-    "max_df": 0.5,
+    "max_df": 0.4,
     "min_df": 5,
     "stem": 0,
     "tribigram": 1,
@@ -32,7 +32,9 @@ parameter_options = {
     "tribigram": [0, 1],
     "stem": [0, 1],
     "diy_gram": [0, 1],
-    "remove_stop": [0, 1]
+    "remove_stop": [0, 1],
+    "chunk": [100, 125, 150, 175, 200],
+    "min_df": [5, 10, 15]
 }
 
 # Get current parameter values to test
@@ -50,6 +52,10 @@ def generate_model_id(param_dict, test_parameter):
         return f"diy_gram_{param_dict['diy_gram']}"
     elif test_parameter == "remove_stop":
         return f"remove_stop_{param_dict['remove_stop']}"
+    elif test_parameter == "chunk":
+        return f"chunk_{param_dict['chunk']}"
+    elif test_parameter == "min_df":
+        return f"min_df_{param_dict['min_df']}"
     else:
         return f"param_{param_dict[test_parameter]}"
 
@@ -100,7 +106,13 @@ documents_df["text_clean"] = documents_df.text.apply(
 )
 
 documents_df = documents_df[~documents_df.isnull()]
-tokens_to_keep_5 = clean_text.get_token_list(documents_df["text_clean"], min_df=base_settings["min_df"])
+
+# Generate tokens_to_keep for each min_df value being tested
+tokens_to_keep_dict = {}
+for min_df_value in current_parameter_values:
+    tokens_to_keep_dict[min_df_value] = clean_text.get_token_list(documents_df["text_clean"], min_df=min_df_value)
+    print(f"Generated {len(tokens_to_keep_dict[min_df_value])} tokens for min_df={min_df_value}")
+
 grams = clean_text.generate_list_of_grams(
     documents_df=documents_df, text_col="text_clean"
 )
@@ -185,11 +197,12 @@ for idx, row in tqdm(processed_docs_df.iterrows()):
         processed_docs_df.at[idx, "text"] = clean_text.lemmatize_text(row["text"])
 processed_docs_df.sample(5)
 
-print("Handling min_df 5")
+print("Handling min_df filtering with flexible token lists")
 for idx, row in tqdm(processed_docs_df.iterrows()):
-    if row["min_df"] == 5:
+    min_df_value = row["min_df"]
+    if min_df_value in tokens_to_keep_dict:
         processed_docs_df.at[idx, "text"] = clean_text.remove_infrequent_tokens(
-            row["text"], tokens_to_keep_5
+            row["text"], tokens_to_keep_dict[min_df_value]
         )
 
 
@@ -329,8 +342,27 @@ for folder in folders:
     )
 
 # Create prevalence data
+print(f"Processing {len(folders)} folders: {folders}")
+print(f"Current parameter values being tested: {current_parameter_values}")
+print(f"Available model_ids in parameters: {list(parameters['model_id'])}")
+
 topic_prevalence_dfs = []
 for folder in folders:
+    # Extract model_id from folder name (e.g., "topic23_min_df_5" -> "min_df_5")
+    model_id = folder.split("topic")[1].split("_", 1)[1]
+    print(f"Processing folder: {folder} -> model_id: {model_id}")
+    
+    # Skip folders that don't match current parameter values being tested
+    param_value = model_id.split("_")[-1] if "_" in model_id else model_id
+    try:
+        param_value_int = int(param_value)
+        if param_value_int not in current_parameter_values:
+            print(f"Skipping folder {folder} (model_id: {model_id}) - not in current test values")
+            continue
+    except ValueError:
+        print(f"Could not parse parameter value from model_id: {model_id}")
+        continue
+    
     wide_df = pd.read_excel(
         output_dir + "topic_models/" + folder + "/doc_topics_grouped.xlsx"
     )
@@ -342,18 +374,15 @@ for folder in folders:
     long_df = long_df.sort_values(by=["district", "prevalence"], ascending=False)
     long_df = long_df.groupby("district").head(5)
     
-    # Extract model_id from folder name (e.g., "topic23_maxdf_0.5" -> "maxdf_0.5")
-    model_id = folder.split("topic")[1].split("_", 1)[1]
     long_df["model_id"] = model_id
     
     topic_count = int(folder.split("topic")[1].split("_")[0])
     model_params = parameters[parameters["model_id"] == model_id]
     if len(model_params) > 0:
         long_df = pd.merge(long_df, model_params, on="model_id")
+        topic_prevalence_dfs.append(long_df)
     else:
-        print(f"Warning: No parameters found for model_id {model_id}")
-    
-    topic_prevalence_dfs.append(long_df)
+        print(f"Warning: No parameters found for model_id {model_id} - skipping")
 
 topic_prevalence_df = pd.concat(topic_prevalence_dfs, ignore_index=True)
 final_df = topic_prevalence_df.merge(docs, on="district")
@@ -361,13 +390,21 @@ final_df = topic_prevalence_df.merge(docs, on="district")
 # Add topic words (following 07_link_terms_for_rating2.py pattern)
 topic_dfs = []
 for folder in folders:
-    # Extract model_id from folder name (e.g., "topic23_maxdf_0.5" -> "maxdf_0.5")
+    # Extract model_id from folder name (e.g., "topic23_min_df_5" -> "min_df_5")
     model_id = folder.split("topic")[1].split("_", 1)[1]
     
-    topic_count = int(folder.split("topic")[1].split("_")[0])
+    # Skip folders that don't match current parameter values being tested
+    param_value = model_id.split("_")[-1] if "_" in model_id else model_id
+    try:
+        param_value_int = int(param_value)
+        if param_value_int not in current_parameter_values:
+            print(f"Skipping folder {folder} (model_id: {model_id}) in topic words section - not in current test values")
+            continue
+    except ValueError:
+        print(f"Could not parse parameter value from model_id: {model_id} in topic words section")
+        continue
     
-    # Get the parameter value being tested
-    param_value = model_id.split("_")[1] if "_" in model_id else model_id
+    topic_count = int(folder.split("topic")[1].split("_")[0])
     wide_topic_df = pd.read_csv(
         output_dir + "topic_models/" + folder + "/topics.csv"
     )
@@ -396,7 +433,6 @@ for folder in folders:
     topic_dfs.append(topic_df)
 
 big_topic_df = pd.concat(topic_dfs)
-# problem: variation in big_topic_df is due to max_df but not included 
 big_topic_df = big_topic_df.pivot(
     index=["model_id", "topic", "topic_number", PARAMETER_TO_TEST], columns="word_rank", values="word"
 )
@@ -443,4 +479,4 @@ grouped_df = grouped_df.reset_index()
 grouped_df = grouped_df.sort_values(by=["model_quality_mean"], ascending=False)
 
 # %%
-# max_df = .4
+# Decision = min _df = 5

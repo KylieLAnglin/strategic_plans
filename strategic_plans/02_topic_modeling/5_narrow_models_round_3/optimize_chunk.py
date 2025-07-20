@@ -12,14 +12,14 @@ import pickle
 
 # Configuration for flexible parameter testing
 # Change PARAMETER_TO_TEST to test different parameters
-PARAMETER_TO_TEST = "max_df"  # Options: "max_df", "tribigram", "stem", etc.
+PARAMETER_TO_TEST = "chunk"  # Options: "max_df", "tribigram", "stem", "chunk", etc.
 
 # Base settings from round 2
 base_settings = {
     "topic": 23,
     "chunk": 150,
     "diy_gram": 0,
-    "max_df": 0.5,
+    "max_df": 0.4,
     "min_df": 5,
     "stem": 0,
     "tribigram": 1,
@@ -32,7 +32,8 @@ parameter_options = {
     "tribigram": [0, 1],
     "stem": [0, 1],
     "diy_gram": [0, 1],
-    "remove_stop": [0, 1]
+    "remove_stop": [0, 1],
+    "chunk": [100, 125, 150, 175, 200]
 }
 
 # Get current parameter values to test
@@ -50,6 +51,8 @@ def generate_model_id(param_dict, test_parameter):
         return f"diy_gram_{param_dict['diy_gram']}"
     elif test_parameter == "remove_stop":
         return f"remove_stop_{param_dict['remove_stop']}"
+    elif test_parameter == "chunk":
+        return f"chunk_{param_dict['chunk']}"
     else:
         return f"param_{param_dict[test_parameter]}"
 
@@ -342,7 +345,7 @@ for folder in folders:
     long_df = long_df.sort_values(by=["district", "prevalence"], ascending=False)
     long_df = long_df.groupby("district").head(5)
     
-    # Extract model_id from folder name (e.g., "topic23_maxdf_0.5" -> "maxdf_0.5")
+    # Extract model_id from folder name (e.g., "topic23_chunk_150" -> "chunk_150")
     model_id = folder.split("topic")[1].split("_", 1)[1]
     long_df["model_id"] = model_id
     
@@ -361,7 +364,7 @@ final_df = topic_prevalence_df.merge(docs, on="district")
 # Add topic words (following 07_link_terms_for_rating2.py pattern)
 topic_dfs = []
 for folder in folders:
-    # Extract model_id from folder name (e.g., "topic23_maxdf_0.5" -> "maxdf_0.5")
+    # Extract model_id from folder name (e.g., "topic23_chunk_150" -> "chunk_150")
     model_id = folder.split("topic")[1].split("_", 1)[1]
     
     topic_count = int(folder.split("topic")[1].split("_")[0])
@@ -396,7 +399,7 @@ for folder in folders:
     topic_dfs.append(topic_df)
 
 big_topic_df = pd.concat(topic_dfs)
-# problem: variation in big_topic_df is due to max_df but not included 
+# problem: variation in big_topic_df is due to chunk but not included 
 big_topic_df = big_topic_df.pivot(
     index=["model_id", "topic", "topic_number", PARAMETER_TO_TEST], columns="word_rank", values="word"
 )
@@ -443,4 +446,4 @@ grouped_df = grouped_df.reset_index()
 grouped_df = grouped_df.sort_values(by=["model_quality_mean"], ascending=False)
 
 # %%
-# max_df = .4
+# Decision = Chunk 15
