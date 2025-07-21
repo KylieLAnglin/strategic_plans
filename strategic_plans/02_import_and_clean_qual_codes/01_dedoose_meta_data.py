@@ -1,8 +1,23 @@
 # %%
-import pandas as pd
+"""
+  - Purpose: Prepares metadata for qualitative coding analysis
+  - Key operations:
+    - Imports plan metadata and filters to qualitative coding sample
+  (include_qual == 1)
+    - Reads Dedoose chart excerpts export file
+    - Filters to specific coders: "mikayla.clemens", "JuliaOas",
+  "kylielanglin"
+    - Creates document-level dataset by merging metadata with coding
+  information
+    - Outputs: dedoose_doc_df.csv, just links district info to media_title, date_coded, and coder
+"""
+# %%
 import re
-from strategic_plans.library import start
+
+import pandas as pd
 import numpy as np
+
+from strategic_plans.library import start
 
 # %%
 meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
@@ -10,6 +25,7 @@ meta_data_df = meta_data_df[meta_data_df.include_qual == 1]
 # %%
 # Excerpts → Select all → Export, named DedooseChartExport
 FILENAME = "DedooseChartExcerpts_2024_11_12_822.xlsx"
+FILENAME = "DedooseChartExcerpts_2025_7_21_1137.xlsx"
 code_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
 code_df["Media Title"].nunique()
 code_df = code_df.rename(

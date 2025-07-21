@@ -1,4 +1,5 @@
 # %%
+# DELETE?
 import pandas as pd
 import re
 from strategic_plans.library import start
@@ -10,8 +11,9 @@ meta_data_df = meta_data_df[meta_data_df.include_qual == 1]
 # %%
 # Excerpts → Select all → Export, named DedooseChartExport
 FILENAME = "DedooseChartExcerpts_2024_11_12_822.xlsx"
+FILENAME = "DedooseChartExcerpts_2025_7_21_1137.xlsx"
 code_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
-code_df["Media Title"].nunique()
+code_df["Media Title"].nunique() # Why 222 media titles? Should be 104. 
 
 
 # %%
@@ -25,6 +27,7 @@ code_df = code_df.rename(
 )
 code_df.sample()
 
+# %%
 code_df = code_df.drop_duplicates()
 # %%
 coders = ["mikayla.clemens", "JuliaOas", "kylielanglin"]

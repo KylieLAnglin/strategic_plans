@@ -1,4 +1,17 @@
 # %%
+"""
+  - Purpose: Main code processing and hierarchical code creation
+  - Key operations:
+    - Imports both excerpts and codes export files from Dedoose
+    - Creates codebook dictionary from code structure
+    - Processes and cleans code column names (removes spaces, special
+  characters)
+    - Aggregates codes at district level using groupby().max()
+    - Implements hierarchical coding: Makes parent codes True when child
+  codes are True
+    - Converts boolean codes to binary (0/1) format
+    - Outputs: plans_codes.csv (final coded dataset)
+"""
 import pandas as pd
 import re
 from strategic_plans.library import start
@@ -9,11 +22,13 @@ meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/dedoose_doc_df.csv")
 
 # %%
 # Excerpts → Select all → Export, named DedooseChartExport
-FILENAME = "DedooseChartExcerpts_2024_11_12_822.xlsx"
+# FILENAME = "DedooseChartExcerpts_2024_11_12_822.xlsx"
+FILENAME = "DedooseChartExcerpts_2025_7_21_1137.xlsx"
 code_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
 code_df["Media Title"].nunique()
 # %%
-FILENAME = "DedooseCodesExport_2024_11_11_1434.xlsx"
+# FILENAME = "DedooseCodesExport_2024_11_11_1434.xlsx"
+FILENAME = "DedooseCodesExport_2025_7_21_1132.xlsx"
 codebook_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
 
 # %%
@@ -61,7 +76,8 @@ long_df.sample()
 
 
 # %%
-codes = [col for col in long_df.columns if "code" in col]
+codes = [col for col in long_df.columns if "code_" in col]
+codes = [col for col in codes if "applied" in col]
 
 df = long_df[["leaid"] + codes].groupby("leaid").max()
 
@@ -85,10 +101,6 @@ df = df[[col for col in df.columns if "range" not in col]]
 df_final = meta_data_df.merge(
     df, left_on="leaid", right_index=True, how="left", indicator="_merge"
 )
-# replace NaN with 0 in columns with "weight" in the name
-df_final[[col for col in df_final if "weight" in col]] = df_final[
-    [col for col in df_final if "weight" in col]
-].fillna(0)
 
 # Replace TRUE with 1 and FALSE with 0 in columns with "applied" in the name
 df_final[[col for col in df_final if "applied" in col]] = df_final[
@@ -123,9 +135,23 @@ df_final = df_final.drop(
         "media_title",
     ]
 )
-
+# %%
+# Merge codebook Title for each code column
+for code_col in [col for col in df_final.columns if "code_" in col]:
+    # Get the code name (remove 'code_' prefix)
+    code_name = code_col.replace("code_", "")
+    # Find matching code in codebook_df
+    match = codebook_df[codebook_df["code"] == code_name]
+    if not match.empty:
+        title = match["Title"].values[0]
+        # Add a new column with the Title
+        df_final[code_col + "_title"] = title
+    else:
+        df_final[code_col + "_title"] = ""
 
 df_final.to_csv(start.MAIN_DIR + "data/clean/plans_codes.csv", index=False)
+
+
 # %%
 
 # %%
