@@ -8,6 +8,8 @@ from openpyxl import load_workbook
 import os
 from openpyxl import Workbook
 
+RESULTS_FILE = start.RESULTS_DIR + "Three Samples Characteristics.xlsx"
+
 # %%
 code_df = pd.read_csv(start.DATA_DIR + "clean/plans_codes_characteristics.csv")
 sample_df = pd.read_csv(start.DATA_DIR + "clean/stratified_sample_characteristics.csv")
@@ -41,7 +43,6 @@ continuous_characteristics = [
     "competitive",
 ]
 
-RESULTS_FILE = start.RESULTS_DIR + "Three Samples Characteristics.xlsx"
 
 file = RESULTS_FILE
 
@@ -128,3 +129,13 @@ ws.cell(row=row, column=col).value = len(df_code)
 
 # %%
 wb.save(file)
+# %%
+# Print districts with highest enrollment and whether they are in code_df and plan_df, including district name
+top_enrollment = df.nlargest(10, "enrollment_in_thousands")[["leaid", "enrollment_in_thousands", "_merge_code", "_merge_plan"]]
+top_enrollment["is_in_code_df"] = top_enrollment["_merge_code"] == "both"
+top_enrollment["is_in_plan_df"] = top_enrollment["_merge_plan"] == "both"
+# Merge with plan_df to get district name
+top_enrollment = top_enrollment.merge(plan_df[["leaid", "district"]], on="leaid", how="left")
+print("Top 10 districts by enrollment:")
+print(top_enrollment[["leaid", "district", "enrollment_in_thousands", "is_in_code_df", "is_in_plan_df"]])
+# %%
