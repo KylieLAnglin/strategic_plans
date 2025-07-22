@@ -22,7 +22,7 @@ sample_inclusion_df = pd.read_excel(INPUT_SAMPLE_INCLUSION_DF) # merge options: 
 
 # %% Clean topic df
 # add "topic_" prefix to column names other than district
-topic_df.columns = ["district"] + [f"topic_{col}" for col in topic_df.columns[1:]]
+topic_df.columns = ["district"] + [f"Topic_{col}" for col in topic_df.columns[1:]]
 topic_df.sample()
 # %%
 # # Try merging text_temp_df with topic_df on lea_name and district
@@ -53,7 +53,9 @@ topic_df.sample()
 # sample topic overlap
 topic_sample = sample_inclusion_df.merge(topic_df, left_on="revised_name", right_on="district", how="inner")
 # keep leaid and topic columns
-topic_sample = topic_sample[["leaid"] + [col for col in topic_sample.columns if col.startswith("topic_")]]
+topic_sample[["leaid", "state", "pdf_name"] + [col for col in topic_sample.columns if col.startswith("Topic_")]].sort_values(by = "pdf_name").to_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics.xlsx", index=False)
+
+topic_sample = topic_sample[["leaid"] + [col for col in topic_sample.columns if col.startswith("Topic_")]]
 
 # sample code overlap
 code_sample = sample_df.merge(code_df, on = "leaid", how='inner')

@@ -11,83 +11,85 @@ from openpyxl.styles import Font, Alignment
 top_topics_df = pd.read_excel(start.RESULTS_DIR + 'top_topics.xlsx')
 print(f"Analyzing {len(top_topics_df)} topics")
 
-# Load topic prevalence data (grouped by district)
-doc_topics_df = pd.read_excel(start.DATA_DIR + 'final_model/topic_model/doc_topics_grouped.xlsx')
-# district_mapping = {
-#       "Academy School District No": "ACADEMY SCHOOL DISTRICT NO. 20 IN THE COUNTY OF EL PASO AN",
-#       "ALEXANDRIA CITY PBLC SCHS": "ALEXANDRIA COMMUNITY SCHOOL CORP",
-#       "Archbold-Area Local": "ARCHBOLD-AREA LOCAL SCHOOL DISTRICT",
-#       "ARLINGTON CO PBLC SCHS": "ARLINGTON COUNTY PUBLIC SCHOOLS",
-#       "Aurora Joint District No": "AURORA JOINT DISTRICT NO. 28 IN THE COUNTY OF ARAPAHOE A",
-#       "BUFFALO CITY SCHOOL DISTRICT": "BUFFALO CITY SD",
-#       "Cannon County": "CANNON COUNTY SCHOOL SYSTEM",
-#       "Clear Creek School District No": "CLEAR CREEK SCHOOL DISTRICT NO. RE-1 IN THE COUNTY OF ",
-#       "Colorado Springs School District No": "COLORADO SPRINGS SCHOOLDISTRICT NO. 11 IN THE COUNTY ",
-#       "CRS1020D": "COLORADO RIVER UNION HIGH SCHOOL DISTRICT",
-#       "DeSmet Elem": "DESMET ELEMENTARY SCHOOL DISTRICT",
-#       "DICKENSON CO PBLC SCHS": "DICKENSON COUNTY PUBLIC SCHOOLS",
-#       "Englewood School District No": "ENGLEWOOD SCHOOL DISTRICT NO. 1 IN THE COUNTY OF ARAPAH",
-#       "Fayette Public Schools": "FAYETTE COUNTY BOARD OF EDUCATION",
-#       "Flagstaff Unified District (4192)": "FLAGSTAFF UNIFIED SCHOOL DISTRICT",
-#       "FORT PLAIN CENTRAL SCHOOL DISTRICT": "FORT PLAIN CSD",
-#       "Glenwood City School District": "GLENWOOD CITY SCHOOL DISTRICT",
-#       "GOUVERNEUR CENTRAL SCHOOL DISTRICT": "GOUVERNEUR CSD",
-#       "GreeleySchool District No": "GREELEY SCHOOL DISTRICT NO. 6 IN THE COUNTY OF WELD AN",
-#       "HALDANE CENTRAL SCHOOL DISTRICT": "HALDANE CSD",
-#       "HAMPTON CITY PBLC SCHS": "HAMPTON CITY PUBLIC SCHOOLS",
-#       "HARPURSVILLE CENTRAL SCHOOL DISTRICT": "HARPURSVILLE CSD",
-#       "Jackson Grammar": "JACKSON COUNTY SCHOOL DISTRICT",
-#       "Liberty Elementary District (4266)": "LIBERTY ELEMENTARY SCHOOL DISTRICT",
-#       "LOWVILLE ACADEMY & CENTRAL SCHOOL DISTRICT": "LOWVILLE ACADEMY & CSD",
-#       "MALONE CENTRAL SCHOOL DISTRICT": "MALONE CSD",
-#       "MANASSAS CITY PBLC SCHS": "MANASSAS CITY PUBLIC SCHOOLS",
-#       "Manitou Springs School District No": "MANITOU SPRINGS SCHOOL DISTRICT NO. 14 IN THE COUNTY ",
-#       "MEADOWS VALLEY DISTRICT": "MEADOWS VALLEY SCHOOL DISTRICT NO. 11",
-#       "Mesa County Valley School District No": "MESA COUNTY VALLEY SCHOOL DISTRICT NO. 51 IN THE COUN",
-#       "Nadaburg Unified School District (4252)": "NADABURG UNIFIED SCHOOL DISTRICT",
-#       "Newton Conover City Schools": "NEWTON CONOVER CITY SCHOOLS",
-#       "PAGE CO PBLC SCHS": "PAGE COUNTY PUBLIC SCHOOLS",
-#       "Peotone CUSD 207U": "PEOTONE COMMUNITY UNIT SCHOOL DISTRICT 207U",
-#       "PLATTE CO": "PLATTE COUNTY SCHOOL SYSTEM",
-#       "Pueblo School District No": "PUEBLO SCHOOL DISTRICT NO. 60 IN THE COUNTY OF PUEBLO",
-#       "Reedsville School District": "REEDSVILLE SCHOOL DISTRICT",
-#       "RENICK R-V": "RENICK R-V SCHOOL DISTRICT",
-#       "Richmond Elementary": "RICHMOND ELEMENTARY SCHOOL DISTRICT",
-#       "ROANOKE CITY PBLC SCHS": "ROANOKE CITY PUBLIC SCHOOLS",
-#       "ROCHESTER CITY SCHOOL DISTRICT": "ROCHESTER CSD",
-#       "ROCHESTER PUBLIC SCHOOL DISTRICT": "ROCHESTER PUBLIC SCHOOL DISTRICT ISD 535",
-#       "RSU 17": "REGIONAL SCHOOL UNIT 17",
-#       "RSU 17_MSAD 17": "REGIONAL SCHOOL UNIT 17/MSAD 17",
-#       "RSU 80": "REGIONAL SCHOOL UNIT 80",
-#       "RSU 80_MSAD 04": "REGIONAL SCHOOL UNIT 80/MSAD 04",
-#       "Salem Public Schools": "SALEM PUBLIC SCHOOL DISTRICT 24J",
-#       "San Jacinto": "SAN JACINTO UNIFIED SCHOOL DISTRICT",
-#       "School District No": "SCHOOL DISTRICT NO. 1 IN THE COUNTY OF DENVER AND CITY",
-#       "SOUTHERN BOONE CO": "SOUTHERN BOONE COUNTY R-I SCHOOL DISTRICT",
-#       "ST": "ST. HELENA UNIFIED SCHOOL DISTRICT",
-#       "SYRACUSE CITY SCHOOL DISTRICT": "SYRACUSE CSD",
-#       "TACONIC HILLS CENTRAL SCHOOL DISTRICT": "TACONIC HILLS CSD",
-#       "TROY CITY SCHOOL DISTRICT": "TROY CITY SCHOOL DISTRICT",
-#       "Ventnor City School District": "VENTNOR CITY SCHOOL DISTRICT"
-#   }
-# doc_topics_df["district"] = doc_topics_df["district"].replace(district_mapping)
-doc_topics_df["district"] = doc_topics_df["district"].str.lower()
-# Load district characteristics
-char_df = pd.read_csv(start.DATA_DIR + 'clean/stratified_sample_characteristics.csv')
-char_df["district"] = char_df["district"].str.lower()
+# # Load topic prevalence data (grouped by district)
+# doc_topics_df = pd.read_excel(start.DATA_DIR + 'final_model/topic_model/doc_topics_grouped.xlsx')
+# # district_mapping = {
+# #       "Academy School District No": "ACADEMY SCHOOL DISTRICT NO. 20 IN THE COUNTY OF EL PASO AN",
+# #       "ALEXANDRIA CITY PBLC SCHS": "ALEXANDRIA COMMUNITY SCHOOL CORP",
+# #       "Archbold-Area Local": "ARCHBOLD-AREA LOCAL SCHOOL DISTRICT",
+# #       "ARLINGTON CO PBLC SCHS": "ARLINGTON COUNTY PUBLIC SCHOOLS",
+# #       "Aurora Joint District No": "AURORA JOINT DISTRICT NO. 28 IN THE COUNTY OF ARAPAHOE A",
+# #       "BUFFALO CITY SCHOOL DISTRICT": "BUFFALO CITY SD",
+# #       "Cannon County": "CANNON COUNTY SCHOOL SYSTEM",
+# #       "Clear Creek School District No": "CLEAR CREEK SCHOOL DISTRICT NO. RE-1 IN THE COUNTY OF ",
+# #       "Colorado Springs School District No": "COLORADO SPRINGS SCHOOLDISTRICT NO. 11 IN THE COUNTY ",
+# #       "CRS1020D": "COLORADO RIVER UNION HIGH SCHOOL DISTRICT",
+# #       "DeSmet Elem": "DESMET ELEMENTARY SCHOOL DISTRICT",
+# #       "DICKENSON CO PBLC SCHS": "DICKENSON COUNTY PUBLIC SCHOOLS",
+# #       "Englewood School District No": "ENGLEWOOD SCHOOL DISTRICT NO. 1 IN THE COUNTY OF ARAPAH",
+# #       "Fayette Public Schools": "FAYETTE COUNTY BOARD OF EDUCATION",
+# #       "Flagstaff Unified District (4192)": "FLAGSTAFF UNIFIED SCHOOL DISTRICT",
+# #       "FORT PLAIN CENTRAL SCHOOL DISTRICT": "FORT PLAIN CSD",
+# #       "Glenwood City School District": "GLENWOOD CITY SCHOOL DISTRICT",
+# #       "GOUVERNEUR CENTRAL SCHOOL DISTRICT": "GOUVERNEUR CSD",
+# #       "GreeleySchool District No": "GREELEY SCHOOL DISTRICT NO. 6 IN THE COUNTY OF WELD AN",
+# #       "HALDANE CENTRAL SCHOOL DISTRICT": "HALDANE CSD",
+# #       "HAMPTON CITY PBLC SCHS": "HAMPTON CITY PUBLIC SCHOOLS",
+# #       "HARPURSVILLE CENTRAL SCHOOL DISTRICT": "HARPURSVILLE CSD",
+# #       "Jackson Grammar": "JACKSON COUNTY SCHOOL DISTRICT",
+# #       "Liberty Elementary District (4266)": "LIBERTY ELEMENTARY SCHOOL DISTRICT",
+# #       "LOWVILLE ACADEMY & CENTRAL SCHOOL DISTRICT": "LOWVILLE ACADEMY & CSD",
+# #       "MALONE CENTRAL SCHOOL DISTRICT": "MALONE CSD",
+# #       "MANASSAS CITY PBLC SCHS": "MANASSAS CITY PUBLIC SCHOOLS",
+# #       "Manitou Springs School District No": "MANITOU SPRINGS SCHOOL DISTRICT NO. 14 IN THE COUNTY ",
+# #       "MEADOWS VALLEY DISTRICT": "MEADOWS VALLEY SCHOOL DISTRICT NO. 11",
+# #       "Mesa County Valley School District No": "MESA COUNTY VALLEY SCHOOL DISTRICT NO. 51 IN THE COUN",
+# #       "Nadaburg Unified School District (4252)": "NADABURG UNIFIED SCHOOL DISTRICT",
+# #       "Newton Conover City Schools": "NEWTON CONOVER CITY SCHOOLS",
+# #       "PAGE CO PBLC SCHS": "PAGE COUNTY PUBLIC SCHOOLS",
+# #       "Peotone CUSD 207U": "PEOTONE COMMUNITY UNIT SCHOOL DISTRICT 207U",
+# #       "PLATTE CO": "PLATTE COUNTY SCHOOL SYSTEM",
+# #       "Pueblo School District No": "PUEBLO SCHOOL DISTRICT NO. 60 IN THE COUNTY OF PUEBLO",
+# #       "Reedsville School District": "REEDSVILLE SCHOOL DISTRICT",
+# #       "RENICK R-V": "RENICK R-V SCHOOL DISTRICT",
+# #       "Richmond Elementary": "RICHMOND ELEMENTARY SCHOOL DISTRICT",
+# #       "ROANOKE CITY PBLC SCHS": "ROANOKE CITY PUBLIC SCHOOLS",
+# #       "ROCHESTER CITY SCHOOL DISTRICT": "ROCHESTER CSD",
+# #       "ROCHESTER PUBLIC SCHOOL DISTRICT": "ROCHESTER PUBLIC SCHOOL DISTRICT ISD 535",
+# #       "RSU 17": "REGIONAL SCHOOL UNIT 17",
+# #       "RSU 17_MSAD 17": "REGIONAL SCHOOL UNIT 17/MSAD 17",
+# #       "RSU 80": "REGIONAL SCHOOL UNIT 80",
+# #       "RSU 80_MSAD 04": "REGIONAL SCHOOL UNIT 80/MSAD 04",
+# #       "Salem Public Schools": "SALEM PUBLIC SCHOOL DISTRICT 24J",
+# #       "San Jacinto": "SAN JACINTO UNIFIED SCHOOL DISTRICT",
+# #       "School District No": "SCHOOL DISTRICT NO. 1 IN THE COUNTY OF DENVER AND CITY",
+# #       "SOUTHERN BOONE CO": "SOUTHERN BOONE COUNTY R-I SCHOOL DISTRICT",
+# #       "ST": "ST. HELENA UNIFIED SCHOOL DISTRICT",
+# #       "SYRACUSE CITY SCHOOL DISTRICT": "SYRACUSE CSD",
+# #       "TACONIC HILLS CENTRAL SCHOOL DISTRICT": "TACONIC HILLS CSD",
+# #       "TROY CITY SCHOOL DISTRICT": "TROY CITY SCHOOL DISTRICT",
+# #       "Ventnor City School District": "VENTNOR CITY SCHOOL DISTRICT"
+# #   }
+# # doc_topics_df["district"] = doc_topics_df["district"].replace(district_mapping)
+# doc_topics_df["district"] = doc_topics_df["district"].str.lower()
+# # Load district characteristics
+# char_df = pd.read_csv(start.DATA_DIR + 'clean/stratified_sample_characteristics.csv')
+# char_df["district"] = char_df["district"].str.lower()
 
 
-# %%
-# Merge prevalence data with district characteristics
-merge_df = doc_topics_df.merge(char_df, on = "district", how='outer', indicator=True)
-merge_df._merge.value_counts() # left_only a problem. right only includes districts without plans
-# %%
-merge_df[merge_df._merge == "left_only"].to_csv(start.RESULTS_DIR + 'left_only_districts_topics.csv', index=False)
-merge_df[merge_df._merge == "right_only"].to_csv(start.RESULTS_DIR + 'right_only_districts_sample.csv', index=False)
-merge_df = merge_df[merge_df._merge == "both"]
-print(f"Merged data has {len(merge_df)} districts")
+# # %%
+# # Merge prevalence data with district characteristics
+# merge_df = doc_topics_df.merge(char_df, on = "district", how='outer', indicator=True)
+# merge_df._merge.value_counts() # left_only a problem. right only includes districts without plans
+# # %%
+# merge_df[merge_df._merge == "left_only"].to_csv(start.RESULTS_DIR + 'left_only_districts_topics.csv', index=False)
+# merge_df[merge_df._merge == "right_only"].to_csv(start.RESULTS_DIR + 'right_only_districts_sample.csv', index=False)
+# merge_df = merge_df[merge_df._merge == "both"]
+# print(f"Merged data has {len(merge_df)} districts")
 
 # %%
+
+merge_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_and_codes.xlsx")
 # Define district characteristics to analyze
 CHARACTERISTICS = [
     "northeast", "midwest", "west", "south",  # Geography (south is reference)
@@ -110,10 +112,7 @@ merge_df["medinc_1000"] = merge_df["medinc_1000"] / 1000
 # Scale enrollment to thousands if needed
 merge_df["enrollment_in_thousands"] = merge_df["enrollment_in_thousands"] / 1000
 
-# Rename int columns to "Topic_" + int
-for col in merge_df.columns:
-    if str(col) in map(str, range(0, 100)):
-        merge_df.rename(columns={col: f"Topic_{col}"}, inplace=True)
+
 # %%
 # Create results workbook
 wb = Workbook()
