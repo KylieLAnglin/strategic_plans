@@ -146,3 +146,10 @@ goal_count[["code_title",  "count_plans", "proportion", "all_districts_rank", "c
 # %%
 
 # %%
+# list 5 documents with goal of interest
+goal_of_interest = "code_soft_skills_sel_social_emotional_learning_applied"
+goal_docs = df[df[goal_of_interest] > 0].sample(5)
+print(f"Documents with goal '{goal_of_interest}':")
+for index, row in goal_docs.iterrows():
+    print(f"  LEAID: {row['leaid']}, Title: {row.get('lea_name', 'No title')}, Year: {row.get('state', 'No state')}")
+# %%
