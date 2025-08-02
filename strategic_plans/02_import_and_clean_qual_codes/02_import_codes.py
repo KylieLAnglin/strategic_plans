@@ -112,13 +112,6 @@ df = long_df[["leaid"] + codes].groupby("leaid").max()
 print(f"Aggregated data for {len(df)} districts")
 
 
-
-# %% Remove unnecessary columns
-# Filter out columns that contain 'range' (not needed for final analysis)
-original_cols = len(df.columns)
-df = df[[col for col in df.columns if "range" not in col]]
-print(f"Removed {original_cols - len(df.columns)} range columns")
-
 # %% Merge with metadata and clean final dataset
 # Merge aggregated codes back with metadata
 df_final = meta_data_df.merge(
@@ -129,41 +122,57 @@ print(f"Final merge: {(df_final._merge == 'both').sum()} districts with codes, {
 
 # Convert boolean values to binary (0/1) for applied columns
 applied_cols = [col for col in df_final.columns if "applied" in col]
-print(f"Converting {len(applied_cols)} applied columns to binary format")
 
 # Replace TRUE/FALSE with 1/0
 df_final[applied_cols] = df_final[applied_cols].replace({True: 1, False: 0})
 
 # Fill any remaining NaN values with 0 (districts without any codes)
 df_final[applied_cols] = df_final[applied_cols].fillna(0)
+print(f"Converted {len(applied_cols)} applied columns to binary format")
+
+# %%
+# Address problem with parent and community codes
+CODES_TO_REMOVE = ["code_old_community_connection_and_buy_in_applied", "code_new_community_connection_and_buy_in_applied", "code_parent_communication_and_involvement_applied"]
+
+df_final = df_final.drop(columns=CODES_TO_REMOVE, errors="ignore")
+PARENT_CODE_FILE = start.DATA_DIR + "clean/plans_codes_previous_parent_and_community.csv"
+correct_parent_codes = pd.read_csv(PARENT_CODE_FILE)
+
+
+KEEP_COLUMNS = ["leaid", "code_family_and_community_community_connection_and_buy_in_applied", "code_family_and_community_parent_communication_and_involvement_applied"]
+# Merge correct parent codes back into final dataset
+df_final = df_final.merge(correct_parent_codes[KEEP_COLUMNS], on="leaid", how="left")
+df_final = df_final.rename(
+    columns={
+        "code_family_and_community_community_connection_and_buy_in_applied": "code_community_connection_and_buy_in_applied",
+        "code_family_and_community_parent_communication_and_involvement_applied": "code_parent_communication_and_involvement_applied",
+    }
+)
 # %% Clean up final dataset
 # Remove columns that are no longer needed for analysis
 columns_to_drop = [
     "pdf_name",           # Redundant filename info
     "revised_name",       # Used only for merging
     "original_document_name",
-    "district_x",         # Duplicate district info
-    "filepath",           # Technical metadata
-    "plan_downloaded",    # Processing flags
+    "district_x",         # Merge conflict
+    "filepath",           
+    "plan_downloaded",    
     "include_ml",
     "complete_qual", 
     "include_qual",
     "document_csv_created",
     "pdf_downloaded",
-    "district_y",         # Duplicate district info
+    "district_y",         # Merge conflict
     "text",               # Full text not needed
     "filename",
     "contains_alphanumeric",
     "failed_parse",
-    "_merge_meta",        # Merge indicators
+    "_merge_meta",        
     "media_title",
 ]
 
-# Check which columns actually exist before dropping
-existing_cols_to_drop = [col for col in columns_to_drop if col in df_final.columns]
-print(f"Dropping {len(existing_cols_to_drop)} unnecessary columns")
 
-df_final = df_final.drop(columns=existing_cols_to_drop)
+df_final = df_final.drop(columns=columns_to_drop, errors="ignore")
 # %%
 # Add code titles for reference
 # Add human-readable titles for each code column to aid interpretation
