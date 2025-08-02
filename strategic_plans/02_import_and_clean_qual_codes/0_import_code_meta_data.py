@@ -10,10 +10,11 @@ meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv
 meta_data_df = meta_data_df[meta_data_df.include_qual == 1]
 # %%
 # Excerpts → Select all → Export, named DedooseChartExport
-FILENAME = "DedooseChartExcerpts_2024_11_12_822.xlsx"
-FILENAME = "DedooseChartExcerpts_2025_7_21_1137.xlsx"
+# FILENAME = "DedooseChartExcerpts_2024_11_12_822.xlsx"
+# FILENAME = "DedooseChartExcerpts_2025_7_21_1137.xlsx"
+FILENAME = "DedooseChartExcerpts_2025_8_2_713.xlsx"
 code_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
-code_df["Media Title"].nunique() # Why 222 media titles? Should be 104. 
+code_df["Media Title"].nunique() # Why 222 media titles? Should be 104. (We coded some not in our sample)
 
 
 # %%

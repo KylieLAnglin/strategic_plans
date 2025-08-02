@@ -23,18 +23,23 @@ meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/dedoose_doc_df.csv")
 
 # %% Load Dedoose exports
 # Import the latest Dedoose chart excerpts (contains actual coded data)
-FILENAME = "DedooseChartExcerpts_2025_7_21_1137.xlsx"
+# FILENAME = "DedooseChartExcerpts_2025_7_21_1137.xlsx"
+FILENAME = "DedooseChartExcerpts_2025_8_2_713.xlsx"
+
 code_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
 print(f"Number of unique media titles in code data: {code_df['Media Title'].nunique()}")
 
 # Import the codebook (contains code definitions and hierarchy)
-FILENAME = "DedooseCodesExport_2025_7_21_1132.xlsx"
+# FILENAME = "DedooseCodesExport_2025_7_21_1132.xlsx"
+FILENAME = "DedooseCodesExport_2025_8_2_721.xlsx"
+print(f"Number of unique codes in codebook: {len(pd.read_excel(start.MAIN_DIR + 'data/raw/Dedoose Exports/' + FILENAME))}")
+
 codebook_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
 
 # %% Process codebook for clean code names
 # Define patterns to standardize code names (spaces, punctuation, etc. become underscores)
 # Include apostrophes, parentheses, and other special characters that might appear in code titles
-patterns = ["\s+", "-", ",+", "_+", "/+", r"\\", "'", r"\(", r"\)", "&", r"\.", ":", ";"]
+patterns = [r"\s+", r"-", r",+", r"_+", r"/+", r"\\", r"'", r"\(", r"\)", r"&", r"\.", r":", r";"]
 regex_pattern = "|".join(patterns)
 
 # Create clean, standardized code names from titles
@@ -51,11 +56,11 @@ for i, (idx, row) in enumerate(codebook_df.head(10).iterrows()):
     print(f"  {row.get('Title', 'N/A')} -> {row['code']}")
     if i >= 5:  # Limit output
         break
-
+# %% Prepare code data
 # Prepare media names by removing .pdf extension
 code_df["media_name"] = code_df["Media Title"].str.replace(".pdf", "")
 
-# %% Extract code columns and prepare for merge
+# Extract code columns and prepare for merge
 # Keep only media name and actual code columns (those starting with 'Code:')
 code_df = code_df[["media_name"] + [col for col in code_df.columns if "Code:" in col]]
 
