@@ -163,19 +163,13 @@ print("Applying manual hierarchical coding rules...")
 child_code = "code_academic_achievement_and_proficiency_reducing_achievement_gaps_applied"
 parent_code = "code_diversity_equity_and_inclusion_applied"
 
-if child_code in df.columns and parent_code in df.columns:
-    # If child is present, parent should be present too
-    df[parent_code] = np.where(
-        df[child_code],
-        True,
-        df[parent_code]
-    )
-    print(f"Applied manual rule: {child_code} -> {parent_code}")
-else:
-    if child_code not in df.columns:
-        print(f"Warning: Child code not found: {child_code}")
-    if parent_code not in df.columns:
-        print(f"Warning: Parent code not found: {parent_code}")
+# If child is present, parent should be present too
+df[parent_code] = np.where(
+    df[child_code],
+    True,
+    df[parent_code]
+)
+print(f"Applied manual rule: {child_code} -> {parent_code}")
 
 # Rule 2: Make "different level learners" a child of "academic achievement" (keep original hierarchy)
 child_code = "code_academic_achievement_and_proficiency_different_level_learners_applied"
@@ -194,6 +188,26 @@ else:
         print(f"Warning: Child code not found: {child_code}")
     if parent_code not in df.columns:
         print(f"Warning: Parent code not found: {parent_code}")
+
+# Rule 3: Create "college and career prep" as parent to career/college related codes
+parent_code = "code_college_and_career_prep_applied"
+child_codes = [
+    "code_career_and_vocational_education_applied",
+    "code_college_acceptance_and_success_applied", 
+    "code_career_planning_applied",
+    "code_academic_achievement_and_proficiency_ap_courses_and_testing_applied"
+]
+
+df[parent_code] = False
+print(f"Created new parent code: {parent_code}")
+
+for child_code in child_codes:
+    df[parent_code] = np.where(
+        df[child_code],
+        True,
+        df[parent_code]
+    )
+    print(f"Applied manual rule: {child_code} -> {parent_code}")
 
 print("Manual hierarchical coding complete.")
 

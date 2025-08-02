@@ -23,7 +23,7 @@ codes = [col for col in df.columns if "applied" in col and not col.endswith("_ti
 codes_to_exclude = [
     "code_teachers_applied", 
     "code_other_unknown_applied",
-    "code_academic_achievement_and_proficiency_different_level_learners_applied"  # Exclude from general goals, include in subgroups
+    # "code_academic_achievement_and_proficiency_different_level_learners_applied"  # Exclude from general goals, include in subgroups
 ]
 # Also exclude any codes with "student_subgroups" in the name
 codes_to_exclude.extend([col for col in codes if "student_subgroups" in col])
@@ -147,9 +147,10 @@ goal_count[["code_title",  "count_plans", "proportion", "all_districts_rank", "c
 
 # %%
 # list 5 documents with goal of interest
-goal_of_interest = "code_soft_skills_sel_social_emotional_learning_applied"
-goal_docs = df[df[goal_of_interest] > 0].sample(5)
+goal_of_interest = "code_student_health_and_well_being_mental_health_suicide_prevention_applied"
+goal_docs = df[df[goal_of_interest] > 0].sample(1)
 print(f"Documents with goal '{goal_of_interest}':")
 for index, row in goal_docs.iterrows():
     print(f"  LEAID: {row['leaid']}, Title: {row.get('lea_name', 'No title')}, Year: {row.get('state', 'No state')}")
+
 # %%
