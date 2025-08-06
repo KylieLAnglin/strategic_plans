@@ -24,8 +24,8 @@ meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/dedoose_doc_df.csv")
 # %% Load Dedoose exports
 # Import the latest Dedoose chart excerpts (contains actual coded data)
 # FILENAME = "DedooseChartExcerpts_2025_7_21_1137.xlsx"
-FILENAME = "DedooseChartExcerpts_2025_8_2_713.xlsx"
-
+# FILENAME = "DedooseChartExcerpts_2025_8_2_713.xlsx"
+FILENAME = "DedooseChartExcerpts_2025_8_6_853.xlsx"
 code_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
 print(f"Number of unique media titles in code data: {code_df['Media Title'].nunique()}")
 
@@ -132,9 +132,7 @@ print(f"Converted {len(applied_cols)} applied columns to binary format")
 
 # %%
 # Address problem with parent and community codes
-CODES_TO_REMOVE = ["code_old_community_connection_and_buy_in_applied", "code_new_community_connection_and_buy_in_applied", "code_parent_communication_and_involvement_applied"]
 
-df_final = df_final.drop(columns=CODES_TO_REMOVE, errors="ignore")
 PARENT_CODE_FILE = start.DATA_DIR + "clean/plans_codes_previous_parent_and_community.csv"
 correct_parent_codes = pd.read_csv(PARENT_CODE_FILE)
 
@@ -148,6 +146,13 @@ df_final = df_final.rename(
         "code_family_and_community_parent_communication_and_involvement_applied": "code_parent_communication_and_involvement_applied",
     }
 )
+
+
+df_final["code_community_connection_and_buy_in_applied"] = np.where(df_final["code_zz_merge_community_economic_development_applied"] == 1, 1, df_final["code_community_connection_and_buy_in_applied"])
+CODES_TO_REMOVE = ["code_zz_delete_family_and_community_applied", "code_zz_delete_new_community_connection_and_buy_in_applied", "code_parent_communication_and_involvement_applied", "code_zz_merge_community_economic_development_applied", "code_other_unknown_applied", "code_old_community_connection_and_buy_in_applied"]
+
+df_final = df_final.drop(columns=CODES_TO_REMOVE, errors="ignore")
+
 # %% Clean up final dataset
 # Remove columns that are no longer needed for analysis
 columns_to_drop = [
