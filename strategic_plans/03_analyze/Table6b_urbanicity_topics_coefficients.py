@@ -11,6 +11,7 @@ import numpy as np
 # Load the data
 top_topics_df = pd.read_excel(start.RESULTS_DIR + 'top_topics.xlsx')
 merge_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_and_codes.xlsx")
+merge_df = merge_df[merge_df.state != "PA"]  # Exclude PA for now
 
 print(f"Analyzing {len(top_topics_df)} topics")
 print(f"Number of districts: {len(merge_df)}")
@@ -46,8 +47,8 @@ wb = Workbook()
 ws = wb.active
 ws.title = "Urbanicity Coefficients (State FE)"
 
-# Set up headers (Urban is reference group, so we show Suburb, Town, Rural coefficients)
-headers = ["Topic", "Suburb", "Town", "Rural", "Adj P-value"]
+# Set up headers (Urban is reference group, so we show Urban mean, Suburb, Town, Rural coefficients)
+headers = ["Topic", "Urban Mean", "Suburb", "Town", "Rural", "Unadj P-value", "Adj P-value"]
 for col, header in enumerate(headers, 1):
     ws.cell(row=1, column=col, value=header)
     ws.cell(row=1, column=col).font = Font(bold=True)
@@ -70,12 +71,19 @@ for topic_code in ordered_topics:
     formula = f"{topic_id} ~ C(urbanicity, Treatment(reference='urban')) + C(state) + improvement_plan + form_plan"
     model = smf.ols(formula, data=merge_df, missing='drop').fit()
     
-    # Extract coefficients for non-reference categories
+    # Calculate mean prevalence for reference group (urban)
+    urban_data = merge_df[merge_df['urbanicity'] == 'urban']
+    urban_mean = urban_data[topic_id].mean()
+    
+    # Extract coefficients and standard errors for non-reference categories
     coefficients = {}
+    std_errors = {}
     for level in urbanicity_levels:
         param_name = f"C(urbanicity, Treatment(reference='urban'))[T.{level}]"
         coeff = model.params.get(param_name, np.nan)
+        std_err = model.bse.get(param_name, np.nan)
         coefficients[level] = coeff
+        std_errors[level] = std_err
     
     # F-test for urbanicity coefficients
     urbanicity_params = [param for param in model.params.index if 'urbanicity' in param]
@@ -89,7 +97,9 @@ for topic_code in ordered_topics:
     topic_results.append({
         'topic_code': topic_code,
         'topic_name': topic_name,
+        'urban_mean': urban_mean,
         'coefficients': coefficients,
+        'std_errors': std_errors,
         'p_value': p_value
     })
 
@@ -105,12 +115,27 @@ for i, result in enumerate(topic_results):
     # Add topic name to Excel
     ws.cell(row=row, column=1, value=result['topic_name'])
     ws.cell(row=row, column=1).font = Font(bold=False)
+    
+    # Add urban mean prevalence to Excel
+    ws.cell(row=row, column=2, value=f"{result['urban_mean']:.2f}")
 
     # Add coefficients to Excel
-    for col_idx, level in enumerate(urbanicity_levels, 2):
+    for col_idx, level in enumerate(urbanicity_levels, 3):
         coeff_val = result['coefficients'][level]
-        ws.cell(row=row, column=col_idx, value=f"{coeff_val:.3f}")
+        ws.cell(row=row, column=col_idx, value=f"{coeff_val:.2f}")
 
+    # Add unadjusted p-value
+    unadj_p_value = result['p_value']
+    if unadj_p_value < 0.001:
+        unadj_p_str = f"{unadj_p_value:.3f}***"
+    elif unadj_p_value < 0.01:
+        unadj_p_str = f"{unadj_p_value:.3f}**"
+    elif unadj_p_value < 0.05:
+        unadj_p_str = f"{unadj_p_value:.3f}*"
+    else:
+        unadj_p_str = f"{unadj_p_value:.3f}"
+    ws.cell(row=row, column=6, value=unadj_p_str)
+    
     # Add adjusted p-value
     adj_p_value = adj_p_values[i]
     if adj_p_value < 0.001:
@@ -121,8 +146,17 @@ for i, result in enumerate(topic_results):
         adj_p_str = f"{adj_p_value:.3f}*"
     else:
         adj_p_str = f"{adj_p_value:.3f}"
-    ws.cell(row=row, column=5, value=adj_p_str)
+    ws.cell(row=row, column=7, value=adj_p_str)
 
+    row += 1
+
+    # Add standard errors row in parentheses
+    ws.cell(row=row, column=1, value="")
+    ws.cell(row=row, column=2, value="")  # Empty cell under urban mean
+    for col_idx, level in enumerate(urbanicity_levels, 3):
+        std_err_val = result['std_errors'][level]
+        ws.cell(row=row, column=col_idx, value=f"({std_err_val:.2f})")
+    
     row += 1
 
 # %%
@@ -132,7 +166,7 @@ for group_name, topics in TOPIC_GROUPS:
     ws.insert_rows(current_row)
     ws.cell(row=current_row, column=1, value=group_name)
     ws.cell(row=current_row, column=1).font = Font(bold=True, italic=True)
-    current_row += 1 + len(topics)
+    current_row += 1 + (len(topics) * 2)  # Each topic now takes 2 rows (coefficient + std error)
 
 # %%
 # Add note about reference category
