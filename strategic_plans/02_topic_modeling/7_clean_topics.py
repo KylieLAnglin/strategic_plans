@@ -30,10 +30,10 @@ doc_topics_df = pd.read_csv(doc_topics_path)
 # Load token data with document text
 docs_df = pd.read_pickle(docs_path)
 # %%
-# Find top 5 documents with highest Topic 20 prevalence
-TOPIC = '22'
+# Find top 5 documents with highest Topic XX prevalence
+TOPIC = '1'
 
-top_topic_docs = doc_topics_df.nlargest(5, TOPIC)[['doc_id', TOPIC]]
+top_topic_docs = doc_topics_df.nlargest(20, TOPIC)[['doc_id', TOPIC]]
 
 print(f"Top 5 documents with highest Topic {TOPIC} prevalence:")
 for idx, row in top_topic_docs.iterrows():

@@ -1,0 +1,161 @@
+# %%
+import pandas as pd
+import numpy as np
+from strategic_plans.library import start
+import statsmodels.formula.api as smf
+from statsmodels.stats.multitest import multipletests
+from openpyxl import Workbook
+from openpyxl.styles import Font
+
+# %%
+# Load the data
+top_topics_df = pd.read_excel(start.RESULTS_DIR + 'top_topics.xlsx')
+merge_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_and_codes.xlsx")
+
+print(f"Analyzing {len(top_topics_df)} topics")
+print(f"Number of districts: {len(merge_df)}")
+
+print(f"Number of states: {merge_df['state'].nunique()}")
+
+# %%
+# Create combined Academic Achievement topic (Topic_9 + Topic_16)
+merge_df['Academic_Achievement'] = merge_df['Topic_9'] + merge_df['Topic_16']
+
+# Add Academic Achievement to top_topics_df
+academic_achievement_row = pd.DataFrame({
+    'Topic ID': ['Academic_Achievement'],
+    'Topic Code': ['Academic Achievement']
+})
+top_topics_df = pd.concat([top_topics_df, academic_achievement_row], ignore_index=True)
+
+# %%
+# Define topic groups in the specified order: Academic, Non-Academic, Family, Mechanisms
+TOPIC_GROUPS = [
+    ("Academic Topics", ["Topic_1", "Topic_8", "Academic_Achievement"]),
+    ("Non-Academic Outcomes", ["Topic_3", "Topic_5", "Topic_12", "Topic_14"]),
+    ("Family and Community", ["Topic_17", "Topic_20"]),
+    ("Mechanisms", ["Topic_0", "Topic_22", "Topic_15"])
+]
+
+# Flatten topic list in the desired order
+ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
+
+# %%
+# Create results workbook
+wb = Workbook()
+ws = wb.active
+ws.title = "Regional Coefficients (State FE)"
+
+# Set up headers (Northeast is reference group, so we show Midwest, West, South coefficients)
+headers = ["Topic", "Midwest", "West", "South", "Adj P-value"]
+for col, header in enumerate(headers, 1):
+    ws.cell(row=1, column=col, value=header)
+    ws.cell(row=1, column=col).font = Font(bold=True)
+
+# %%
+# Create region categorical variable for regression (Northeast as reference)
+merge_df['region_cat'] = 'northeast'  # Default to northeast as reference
+merge_df.loc[merge_df['midwest'] == 1, 'region_cat'] = 'midwest'
+merge_df.loc[merge_df['west'] == 1, 'region_cat'] = 'west'
+merge_df.loc[merge_df['south'] == 1, 'region_cat'] = 'south'
+
+# %%
+# Prepare to store results and p-values for BH correction
+p_values = []
+topic_results = []
+region_levels = ["midwest", "west", "south"]  # Northeast is reference
+
+# First pass: collect all p-values and coefficients using regression
+for topic_code in ordered_topics:
+    topic_row = top_topics_df[top_topics_df['Topic ID'] == topic_code]
+    topic_id = topic_row.iloc[0]['Topic ID']
+    topic_name = topic_row.iloc[0]['Topic Code']
+
+    # Run regression (northeast is reference category by default)
+    formula = f"{topic_id} ~ C(region_cat, Treatment(reference='northeast')) + improvement_plan + form_plan"
+    model = smf.ols(formula, data=merge_df, missing='drop').fit()
+    
+    # Extract coefficients for non-reference categories (Northeast is omitted)
+    coefficients = {}
+    for level in region_levels:
+        param_name = f"C(region_cat, Treatment(reference='northeast'))[T.{level}]"
+        coeff = model.params[param_name]
+        coefficients[level] = coeff
+    # F-test for region coefficients
+    region_params = [param for param in model.params.index if 'region_cat' in param]
+    f_test = model.f_test([param for param in region_params])
+    p_value = f_test.pvalue
+    print(f"Topic {topic_code} F-statistic: {f_test.fvalue:.3f}, P-value: {p_value:.4f}")
+    
+    p_values.append(p_value)
+
+    # Store results for second pass
+    topic_results.append({
+        'topic_code': topic_code,
+        'topic_name': topic_name,
+        'coefficients': coefficients,
+        'p_value': p_value
+    })
+
+# %%
+# Apply Benjamini-Hochberg correction
+rejected, p_adjusted, alpha_sidak, alpha_bonf = multipletests(p_values, method='fdr_bh')
+adj_p_values = p_adjusted
+
+# %%
+# Second pass: write to Excel with coefficients and adjusted p-values
+row = 2
+for i, result in enumerate(topic_results):
+    # Add topic name to Excel
+    ws.cell(row=row, column=1, value=result['topic_name'])
+    ws.cell(row=row, column=1).font = Font(bold=False)
+
+    # Add coefficients to Excel
+    for col_idx, level in enumerate(region_levels, 2):
+        coeff_val = result['coefficients'][level]
+        ws.cell(row=row, column=col_idx, value=f"{coeff_val:.3f}")
+
+    # Add adjusted p-value
+    adj_p_value = adj_p_values[i]
+    if adj_p_value < 0.001:
+        adj_p_str = f"{adj_p_value:.3f}***"
+    elif adj_p_value < 0.01:
+        adj_p_str = f"{adj_p_value:.3f}**"
+    elif adj_p_value < 0.05:
+        adj_p_str = f"{adj_p_value:.3f}*"
+    else:
+        adj_p_str = f"{adj_p_value:.3f}"
+    ws.cell(row=row, column=5, value=adj_p_str)
+
+    row += 1
+
+# %%
+# Add group separators in Excel
+current_row = 2
+for group_name, topics in TOPIC_GROUPS:
+    ws.insert_rows(current_row)
+    ws.cell(row=current_row, column=1, value=group_name)
+    ws.cell(row=current_row, column=1).font = Font(bold=True, italic=True)
+    current_row += 1 + len(topics)
+
+# %%
+# Add note about reference category
+ws.cell(row=current_row + 1, column=1, value="Note: Northeast is the reference category")
+ws.cell(row=current_row + 1, column=1).font = Font(italic=True)
+
+# %%
+# Save Excel results
+output_path = start.RESULTS_DIR + 'Table7b_regions_topics_coefficients.xlsx'
+wb.save(output_path)
+print(f"\nTable exported to {output_path}")
+
+# %%
+# Print summary stats
+print("\nSummary Statistics:")
+print(f"Number of districts analyzed: {len(merge_df)}")
+print(f"Number of topics analyzed: {len(ordered_topics)}")
+print("Reference category: Northeast")
+print("Coefficients shown for: Midwest, West, South")
+
+print(f"\nNo state fixed effects - analyzing regional differences directly")
+print("Note: Regional analysis without state controls to avoid multicollinearity")

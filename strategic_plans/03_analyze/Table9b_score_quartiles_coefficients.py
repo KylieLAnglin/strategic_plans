@@ -1,0 +1,166 @@
+# %%
+import pandas as pd
+import numpy as np
+from strategic_plans.library import start
+import statsmodels.formula.api as smf
+from statsmodels.stats.multitest import multipletests
+from openpyxl import Workbook
+from openpyxl.styles import Font
+
+# %%
+# Load the data
+top_topics_df = pd.read_excel(start.RESULTS_DIR + 'top_topics.xlsx')
+merge_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_and_codes.xlsx")
+
+print(f"Analyzing {len(top_topics_df)} topics")
+print(f"Number of districts: {len(merge_df)}")
+
+print(f"Number of states: {merge_df['state'].nunique()}")
+
+# %%
+# Create quartiles based on mean_test_score
+merge_df['score_quartile'] = pd.qcut(merge_df['mean_test_score'], 
+                                    q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
+
+# Print quartile ranges
+print("\nTest Score Quartiles:")
+quartile_stats = merge_df.groupby('score_quartile')['mean_test_score'].agg(['min', 'max', 'mean', 'count'])
+for quartile in ['Q1', 'Q2', 'Q3', 'Q4']:
+    stats = quartile_stats.loc[quartile]
+    print(f"{quartile}: {stats['min']:.2f} - {stats['max']:.2f} (mean: {stats['mean']:.2f}, n={stats['count']})")
+
+# %%
+# Create combined Academic Achievement topic (Topic_9 + Topic_16)
+merge_df['Academic_Achievement'] = merge_df['Topic_9'] + merge_df['Topic_16']
+
+# Add Academic Achievement to top_topics_df
+academic_achievement_row = pd.DataFrame({
+    'Topic ID': ['Academic_Achievement'],
+    'Topic Code': ['Academic Achievement']
+})
+top_topics_df = pd.concat([top_topics_df, academic_achievement_row], ignore_index=True)
+
+# %%
+# Define topic groups in the specified order: Academic, Non-Academic, Family, Mechanisms
+TOPIC_GROUPS = [
+    ("Academic Topics", ["Topic_1", "Topic_8", "Academic_Achievement"]),
+    ("Non-Academic Outcomes", ["Topic_3", "Topic_5", "Topic_12", "Topic_14"]),
+    ("Family and Community", ["Topic_17", "Topic_20"]),
+    ("Mechanisms", ["Topic_0", "Topic_22", "Topic_15"])
+]
+
+# Flatten topic list in the desired order
+ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
+
+# %%
+# Create results workbook
+wb = Workbook()
+ws = wb.active
+ws.title = "Score Coefficients (State FE)"
+
+# Set up headers (Q1 is reference group, so we show Q2, Q3, Q4 coefficients)
+headers = ["Topic", "Q2", "Q3", "Q4", "Adj P-value"]
+for col, header in enumerate(headers, 1):
+    ws.cell(row=1, column=col, value=header)
+    ws.cell(row=1, column=col).font = Font(bold=True)
+
+# %%
+# Prepare to store results and p-values for BH correction
+p_values = []
+topic_results = []
+quartile_levels = ["Q2", "Q3", "Q4"]  # Q1 is reference
+
+# First pass: collect all p-values and coefficients using state fixed effects regression
+for topic_code in ordered_topics:
+    topic_row = top_topics_df[top_topics_df['Topic ID'] == topic_code]
+    topic_id = topic_row.iloc[0]['Topic ID']
+    topic_name = topic_row.iloc[0]['Topic Code']
+
+    # Run regression with state fixed effects (Q1 is reference category by default)
+    formula = f"{topic_id} ~ C(score_quartile) + C(state) + improvement_plan + form_plan"
+    model = smf.ols(formula, data=merge_df, missing='drop').fit()
+    
+    # Extract coefficients for non-reference categories
+    coefficients = {}
+    for level in quartile_levels:
+        param_name = f"C(score_quartile)[T.{level}]"
+        coeff = model.params[param_name]
+        coefficients[level] = coeff
+    
+    # F-test for quartile coefficients
+    quartile_params = [param for param in model.params.index if 'score_quartile' in param]
+    f_test = model.f_test([param for param in quartile_params])
+    p_value = f_test.pvalue
+    print(f"Topic {topic_code} State FE F-statistic: {f_test.fvalue:.3f}, P-value: {p_value:.4f}")
+    
+    p_values.append(p_value)
+
+    # Store results for second pass
+    topic_results.append({
+        'topic_code': topic_code,
+        'topic_name': topic_name,
+        'coefficients': coefficients,
+        'p_value': p_value
+    })
+
+# %%
+# Apply Benjamini-Hochberg correction
+rejected, p_adjusted, alpha_sidak, alpha_bonf = multipletests(p_values, method='fdr_bh')
+adj_p_values = p_adjusted
+
+# %%
+# Second pass: write to Excel with coefficients and adjusted p-values
+row = 2
+for i, result in enumerate(topic_results):
+    # Add topic name to Excel
+    ws.cell(row=row, column=1, value=result['topic_name'])
+    ws.cell(row=row, column=1).font = Font(bold=False)
+
+    # Add coefficients to Excel
+    for col_idx, level in enumerate(quartile_levels, 2):
+        coeff_val = result['coefficients'][level]
+        ws.cell(row=row, column=col_idx, value=f"{coeff_val:.3f}")
+
+    # Add adjusted p-value
+    adj_p_value = adj_p_values[i]
+    if adj_p_value < 0.001:
+        adj_p_str = f"{adj_p_value:.3f}***"
+    elif adj_p_value < 0.01:
+        adj_p_str = f"{adj_p_value:.3f}**"
+    elif adj_p_value < 0.05:
+        adj_p_str = f"{adj_p_value:.3f}*"
+    else:
+        adj_p_str = f"{adj_p_value:.3f}"
+    ws.cell(row=row, column=5, value=adj_p_str)
+
+    row += 1
+
+# %%
+# Add group separators in Excel
+current_row = 2
+for group_name, topics in TOPIC_GROUPS:
+    ws.insert_rows(current_row)
+    ws.cell(row=current_row, column=1, value=group_name)
+    ws.cell(row=current_row, column=1).font = Font(bold=True, italic=True)
+    current_row += 1 + len(topics)
+
+# %%
+# Add note about reference category
+ws.cell(row=current_row + 1, column=1, value="Note: Q1 (lowest test scores) is the reference category")
+ws.cell(row=current_row + 1, column=1).font = Font(italic=True)
+
+# %%
+# Save Excel results
+output_path = start.RESULTS_DIR + 'Table9b_score_quartiles_coefficients.xlsx'
+wb.save(output_path)
+print(f"\nTable exported to {output_path}")
+
+# %%
+# Print summary stats
+print("\nSummary Statistics:")
+print(f"Number of districts analyzed: {len(merge_df)}")
+print(f"Number of topics analyzed: {len(ordered_topics)}")
+print("Reference category: Q1 (lowest test scores)")
+print("Coefficients shown for: Q2, Q3, Q4")
+
+print(f"\nState fixed effects included for {merge_df['state'].nunique()} states")

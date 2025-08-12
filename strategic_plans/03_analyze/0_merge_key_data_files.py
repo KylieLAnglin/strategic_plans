@@ -11,13 +11,14 @@ INPUT_CODE_DF = start.DATA_DIR + "clean/plans_codes.csv"
 INPUT_TOPIC_DF = start.DATA_DIR + "final_model/topic_model/doc_topics_grouped.xlsx"
 INPUT_CSV_META_DATA_DF = start.DATA_DIR + "clean/meta_data_df.csv"
 INPUT_SAMPLE_INCLUSION_DF = start.DATA_DIR + "sample_inclusion.xlsx"
+INPUT_LABELLED_PLANS_DF = start.DATA_DIR + "clean/sample_inclusion_with_topics_labeled.xlsx"
 sample_df = pd.read_csv(INPUT_SAMPLE_DF) # merge options: leaid, district (all caps)
 text_df = pd.read_csv(INPUT_TEXT_DF) # merge options: leaid, lea_name (mixed caps), pdf_name (mixed_caps)
 code_df = pd.read_csv(INPUT_CODE_DF) # merge options: leaid, lea_name (mixed caps), dedoose_name (mixed caps)
 topic_df = pd.read_excel(INPUT_TOPIC_DF) # merge options: district (mixed caps)
 meta_data_df = pd.read_csv(INPUT_CSV_META_DATA_DF) # merge options: leaid, lea_name, pdf_name (nothing new?)
 sample_inclusion_df = pd.read_excel(INPUT_SAMPLE_INCLUSION_DF) # merge options: leaid, lea_name, pdf_name
-
+labelled_plans_df = pd.read_excel(INPUT_LABELLED_PLANS_DF) # merge options: leaid, lea_name, pdf_name
 
 
 # %% Clean topic df
@@ -73,6 +74,10 @@ df = df.drop(columns=["_merge_sample_topic", "_merge_sample_code"])
 
 df.sample()
 
+labelled_plans_df = labelled_plans_df[["leaid", "improvement_plan", "form_plan" ]]
+df = df.merge(labelled_plans_df, on="leaid", how='left')
+
+# %%
 # count if in both model and human sample
 in_both = df[(df.in_model_sample == 1) & (df.in_human_sample == 1)]
 print(f"Number of districts in both model and human sample: {len(in_both)}")
