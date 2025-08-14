@@ -11,11 +11,23 @@ from openpyxl.styles import Font
 # Load the data
 top_topics_df = pd.read_excel(start.RESULTS_DIR + 'top_topics.xlsx')
 merge_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_and_codes.xlsx")
-merge_df = merge_df[merge_df.state != "PA"]  # Exclude PA for now
+
 print(f"Analyzing {len(top_topics_df)} topics")
 print(f"Number of districts: {len(merge_df)}")
 
 print(f"Number of states: {merge_df['state'].nunique()}")
+
+# %%
+# Create quartiles based on mean_test_score
+merge_df['score_quartile'] = pd.qcut(merge_df['mean_test_score'], 
+                                    q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
+
+# Print quartile ranges
+print("\nTest Score Quartiles:")
+quartile_stats = merge_df.groupby('score_quartile')['mean_test_score'].agg(['min', 'max', 'mean', 'count'])
+for quartile in ['Q1', 'Q2', 'Q3', 'Q4']:
+    stats = quartile_stats.loc[quartile]
+    print(f"{quartile}: {stats['min']:.2f} - {stats['max']:.2f} (mean: {stats['mean']:.2f}, n={stats['count']})")
 
 # %%
 # Create combined Academic Achievement topic (Topic_9 + Topic_16)
@@ -44,55 +56,49 @@ ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
 # Create results workbook
 wb = Workbook()
 ws = wb.active
-ws.title = "Regional Coefficients (State FE)"
+ws.title = "Score Coefficients (State FE)"
 
-# Set up headers (Northeast is reference group, so we show Northeast mean, Midwest, West, South coefficients)
-headers = ["Topic", "Northeast Mean", "Midwest", "West", "South", "Unadj P-value", "Adj P-value"]
+# Set up headers (Q1 is reference group, so we show Q1 mean, Q2, Q3, Q4 coefficients)
+headers = ["Topic", "Q1 Mean", "Q2", "Q3", "Q4", "Unadj P-value", "Adj P-value"]
 for col, header in enumerate(headers, 1):
     ws.cell(row=1, column=col, value=header)
     ws.cell(row=1, column=col).font = Font(bold=True)
 
 # %%
-# Create region categorical variable for regression (Northeast as reference)
-merge_df['region_cat'] = 'northeast'  # Default to northeast as reference
-merge_df.loc[merge_df['midwest'] == 1, 'region_cat'] = 'midwest'
-merge_df.loc[merge_df['west'] == 1, 'region_cat'] = 'west'
-merge_df.loc[merge_df['south'] == 1, 'region_cat'] = 'south'
-
-# %%
 # Prepare to store results and p-values for BH correction
 p_values = []
 topic_results = []
-region_levels = ["midwest", "west", "south"]  # Northeast is reference
+quartile_levels = ["Q2", "Q3", "Q4"]  # Q1 is reference
 
-# First pass: collect all p-values and coefficients using regression
+# First pass: collect all p-values and coefficients using state fixed effects regression
 for topic_code in ordered_topics:
     topic_row = top_topics_df[top_topics_df['Topic ID'] == topic_code]
     topic_id = topic_row.iloc[0]['Topic ID']
     topic_name = topic_row.iloc[0]['Topic Code']
 
-    # Calculate mean prevalence for reference group (northeast)
-    northeast_data = merge_df[merge_df['region_cat'] == 'northeast']
-    northeast_mean = northeast_data[topic_id].mean()
+    # Calculate mean prevalence for reference group (Q1)
+    q1_data = merge_df[merge_df['score_quartile'] == 'Q1']
+    q1_mean = q1_data[topic_id].mean()
     
-    # Run regression (northeast is reference category by default)
-    formula = f"{topic_id} ~ C(region_cat, Treatment(reference='northeast')) + improvement_plan + form_plan + word_count"
+    # Run regression with state fixed effects (Q1 is reference category by default)
+    formula = f"{topic_id} ~ C(score_quartile) + C(state) + improvement_plan + form_plan + word_count"
     model = smf.ols(formula, data=merge_df, missing='drop').fit()
-    
-    # Extract coefficients and standard errors for non-reference categories (Northeast is omitted)
+
+    # Extract coefficients and standard errors for non-reference categories
     coefficients = {}
     std_errors = {}
-    for level in region_levels:
-        param_name = f"C(region_cat, Treatment(reference='northeast'))[T.{level}]"
+    for level in quartile_levels:
+        param_name = f"C(score_quartile)[T.{level}]"
         coeff = model.params[param_name]
         std_err = model.bse[param_name]
         coefficients[level] = coeff
         std_errors[level] = std_err
-    # F-test for region coefficients
-    region_params = [param for param in model.params.index if 'region_cat' in param]
-    f_test = model.f_test([param for param in region_params])
+    
+    # F-test for quartile coefficients
+    quartile_params = [param for param in model.params.index if 'score_quartile' in param]
+    f_test = model.f_test([param for param in quartile_params])
     p_value = f_test.pvalue
-    print(f"Topic {topic_code} F-statistic: {f_test.fvalue:.3f}, P-value: {p_value:.4f}")
+    print(f"Topic {topic_code} State FE F-statistic: {f_test.fvalue:.3f}, P-value: {p_value:.4f}")
     
     p_values.append(p_value)
 
@@ -100,7 +106,7 @@ for topic_code in ordered_topics:
     topic_results.append({
         'topic_code': topic_code,
         'topic_name': topic_name,
-        'northeast_mean': northeast_mean,
+        'q1_mean': q1_mean,
         'coefficients': coefficients,
         'std_errors': std_errors,
         'p_value': p_value
@@ -119,11 +125,11 @@ for i, result in enumerate(topic_results):
     ws.cell(row=row, column=1, value=result['topic_name'])
     ws.cell(row=row, column=1).font = Font(bold=False)
     
-    # Add northeast mean prevalence to Excel
-    ws.cell(row=row, column=2, value=f"{result['northeast_mean']:.2f}")
+    # Add Q1 mean prevalence to Excel
+    ws.cell(row=row, column=2, value=f"{result['q1_mean']:.2f}")
 
     # Add coefficients to Excel
-    for col_idx, level in enumerate(region_levels, 3):
+    for col_idx, level in enumerate(quartile_levels, 3):
         coeff_val = result['coefficients'][level]
         ws.cell(row=row, column=col_idx, value=f"{coeff_val:.2f}")
 
@@ -155,8 +161,8 @@ for i, result in enumerate(topic_results):
 
     # Add standard errors row in parentheses
     ws.cell(row=row, column=1, value="")
-    ws.cell(row=row, column=2, value="")  # Empty cell under northeast mean
-    for col_idx, level in enumerate(region_levels, 3):
+    ws.cell(row=row, column=2, value="")  # Empty cell under Q1 mean
+    for col_idx, level in enumerate(quartile_levels, 3):
         std_err_val = result['std_errors'][level]
         ws.cell(row=row, column=col_idx, value=f"({std_err_val:.2f})")
     
@@ -173,12 +179,12 @@ for group_name, topics in TOPIC_GROUPS:
 
 # %%
 # Add note about reference category
-ws.cell(row=current_row + 1, column=1, value="Note: Northeast is the reference category")
+ws.cell(row=current_row + 1, column=1, value="Note: Q1 (lowest test scores) is the reference category")
 ws.cell(row=current_row + 1, column=1).font = Font(italic=True)
 
 # %%
 # Save Excel results
-output_path = start.RESULTS_DIR + 'Table7b_regions_topics_coefficients.xlsx'
+output_path = start.RESULTS_DIR + 'Table9_score_quartiles_coefficients.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")
 
@@ -187,8 +193,7 @@ print(f"\nTable exported to {output_path}")
 print("\nSummary Statistics:")
 print(f"Number of districts analyzed: {len(merge_df)}")
 print(f"Number of topics analyzed: {len(ordered_topics)}")
-print("Reference category: Northeast")
-print("Coefficients shown for: Midwest, West, South")
+print("Reference category: Q1 (lowest test scores)")
+print("Coefficients shown for: Q2, Q3, Q4")
 
-print(f"\nNo state fixed effects - analyzing regional differences directly")
-print("Note: Regional analysis without state controls to avoid multicollinearity")
+print(f"\nState fixed effects included for {merge_df['state'].nunique()} states")

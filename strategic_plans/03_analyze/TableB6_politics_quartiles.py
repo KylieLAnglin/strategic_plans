@@ -220,7 +220,7 @@ for col_idx, quartile in enumerate(quartile_labels, 2):
 
 # %%
 # Save Excel results
-output_path = start.RESULTS_DIR + 'Table11_politics_quartiles.xlsx'
+output_path = start.RESULTS_DIR + 'TableB6_politics_quartiles.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")
 

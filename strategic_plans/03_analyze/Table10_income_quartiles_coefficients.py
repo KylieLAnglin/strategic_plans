@@ -191,7 +191,7 @@ ws.cell(row=current_row + 1, column=1).font = Font(italic=True)
 
 # %%
 # Save Excel results
-output_path = start.RESULTS_DIR + 'Table10b_income_quartiles_coefficients.xlsx'
+output_path = start.RESULTS_DIR + 'Table10_income_quartiles_coefficients.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")
 

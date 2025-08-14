@@ -18,16 +18,16 @@ print(f"Number of districts: {len(merge_df)}")
 print(f"Number of states: {merge_df['state'].nunique()}")
 
 # Scale percentage variable to 0-100 scale if needed
-merge_df["district_pct_trump"] = merge_df["district_pct_trump"] * 100
+merge_df["percent_race_black_hispanic"] = merge_df["percent_race_black_hispanic"] * 100
 
 # %%
-# Create quartiles based on district_pct_trump
-merge_df['politics_quartile'] = pd.qcut(merge_df['district_pct_trump'], 
-                                       q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
+# Create quartiles based on percent_race_black_hispanic
+merge_df['demographic_quartile'] = pd.qcut(merge_df['percent_race_black_hispanic'], 
+                                          q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
 
 # Print quartile ranges
-print("\nPolitical Quartiles (% Trump Vote):")
-quartile_stats = merge_df.groupby('politics_quartile')['district_pct_trump'].agg(['min', 'max', 'mean', 'count'])
+print("\nDemographic Quartiles (% Black/Hispanic):")
+quartile_stats = merge_df.groupby('demographic_quartile')['percent_race_black_hispanic'].agg(['min', 'max', 'mean', 'count'])
 for quartile in ['Q1', 'Q2', 'Q3', 'Q4']:
     stats = quartile_stats.loc[quartile]
     print(f"{quartile}: {stats['min']:.1f}% - {stats['max']:.1f}% (mean: {stats['mean']:.1f}%, n={stats['count']})")
@@ -59,7 +59,7 @@ ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
 # Create results workbook
 wb = Workbook()
 ws = wb.active
-ws.title = "Politics Coefficients (State FE)"
+ws.title = "Demographic Coefficients (State FE)"
 
 # Set up headers (Q1 is reference group, so we show Q1 mean, Q2, Q3, Q4 coefficients)
 headers = ["Topic", "Q1 Mean", "Q2", "Q3", "Q4", "Unadj P-value", "Adj P-value"]
@@ -80,25 +80,25 @@ for topic_code in ordered_topics:
     topic_name = topic_row.iloc[0]['Topic Code']
 
     # Calculate mean prevalence for reference group (Q1)
-    q1_data = merge_df[merge_df['politics_quartile'] == 'Q1']
+    q1_data = merge_df[merge_df['demographic_quartile'] == 'Q1']
     q1_mean = q1_data[topic_id].mean()
     
     # Run regression with state fixed effects (Q1 is reference category by default)
-    formula = f"{topic_id} ~ C(politics_quartile) + C(state) + improvement_plan + form_plan + word_count"
+    formula = f"{topic_id} ~ C(demographic_quartile) + C(state) + improvement_plan + form_plan + word_count"
     model = smf.ols(formula, data=merge_df, missing='drop').fit()
     
     # Extract coefficients and standard errors for non-reference categories
     coefficients = {}
     std_errors = {}
     for level in quartile_levels:
-        param_name = f"C(politics_quartile)[T.{level}]"
+        param_name = f"C(demographic_quartile)[T.{level}]"
         coeff = model.params[param_name]
         std_err = model.bse[param_name]
         coefficients[level] = coeff
         std_errors[level] = std_err
     
     # F-test for quartile coefficients
-    quartile_params = [param for param in model.params.index if 'politics_quartile' in param]
+    quartile_params = [param for param in model.params.index if 'demographic_quartile' in param]
     f_test = model.f_test([param for param in quartile_params])
     p_value = f_test.pvalue
     print(f"Topic {topic_code} State FE F-statistic: {f_test.fvalue:.3f}, P-value: {p_value:.4f}")
@@ -182,12 +182,12 @@ for group_name, topics in TOPIC_GROUPS:
 
 # %%
 # Add note about reference category
-ws.cell(row=current_row + 1, column=1, value="Note: Q1 (lowest % Trump vote) is the reference category")
+ws.cell(row=current_row + 1, column=1, value="Note: Q1 (lowest % Black/Hispanic) is the reference category")
 ws.cell(row=current_row + 1, column=1).font = Font(italic=True)
 
 # %%
 # Save Excel results
-output_path = start.RESULTS_DIR + 'Table11b_politics_quartiles_coefficients.xlsx'
+output_path = start.RESULTS_DIR + 'Table8_demographic_quartiles_coefficients.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")
 
@@ -196,7 +196,7 @@ print(f"\nTable exported to {output_path}")
 print("\nSummary Statistics:")
 print(f"Number of districts analyzed: {len(merge_df)}")
 print(f"Number of topics analyzed: {len(ordered_topics)}")
-print("Reference category: Q1 (lowest % Trump vote)")
+print("Reference category: Q1 (lowest % Black/Hispanic)")
 print("Coefficients shown for: Q2, Q3, Q4")
 
 print(f"\nState fixed effects included for {merge_df['state'].nunique()} states")

@@ -15,24 +15,21 @@ merge_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_an
 print(f"Analyzing {len(top_topics_df)} topics")
 print(f"Number of districts: {len(merge_df)}")
 
-# Scale income to thousands if needed (assuming it's already scaled based on the variable name)
-merge_df["medinc_1000"] = merge_df["medinc_1000"] / 1000
+# Scale percentage variable to 0-100 scale if needed
+merge_df["percent_race_black_hispanic"] = merge_df["percent_race_black_hispanic"] * 100
 
 # %%
-# Create quartiles based on medinc_1000
-merge_df['income_quartile'] = pd.qcut(merge_df['medinc_1000'], 
-                                     q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
+# Create quartiles based on percent_race_black_hispanic
+merge_df['demographic_quartile'] = pd.qcut(merge_df['percent_race_black_hispanic'], 
+                                          q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
 
-# Print quartile ranges in full dollars
-print("\nIncome Quartiles (in $):")
-quartile_stats = merge_df.groupby('income_quartile')['medinc_1000'].agg(['min', 'max', 'mean', 'count'])
+# Print quartile ranges
+print("\nDemographic Quartiles (% Black/Hispanic):")
+quartile_stats = merge_df.groupby('demographic_quartile')['percent_race_black_hispanic'].agg(['min', 'max', 'mean', 'count'])
 for quartile in ['Q1', 'Q2', 'Q3', 'Q4']:
     stats = quartile_stats.loc[quartile]
-    min_dollars = stats['min'] * 1000
-    max_dollars = stats['max'] * 1000
-    mean_dollars = stats['mean'] * 1000
-    print(f"{quartile}: ${min_dollars:,.0f} - ${max_dollars:,.0f} "
-          f"(mean: ${mean_dollars:,.0f}, n={stats['count']})")
+    print(f"{quartile}: {stats['min']:.1f}% - {stats['max']:.1f}% (mean: {stats['mean']:.1f}%, n={stats['count']})")
+
 # %%
 # Create combined Academic Achievement topic (Topic_9 + Topic_16)
 merge_df['Academic_Achievement'] = merge_df['Topic_9'] + merge_df['Topic_16']
@@ -60,7 +57,7 @@ ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
 # Create results workbook
 wb = Workbook()
 ws = wb.active
-ws.title = "Income Quartiles Topic Analysis"
+ws.title = "Demographic Quartiles Topic Analysis"
 
 # Set up headers
 headers = ["Topic", "Q1", "Q2", "Q3", "Q4", "Adj P-value"]
@@ -89,7 +86,7 @@ for topic_code in ordered_topics:
     quartile_data_dict = {}
 
     for quartile in quartile_labels:
-        group_df = merge_df[merge_df['income_quartile'] == quartile]
+        group_df = merge_df[merge_df['demographic_quartile'] == quartile]
         values = group_df[topic_id].values if len(group_df) > 0 else np.array([])
         quartile_data_dict[quartile] = values
 
@@ -205,23 +202,25 @@ ws.cell(row=current_row + 1, column=1, value="Sample Size (N)")
 ws.cell(row=current_row + 1, column=1).font = Font(bold=False)
 
 for col_idx, quartile in enumerate(quartile_labels, 2):
-    count = len(merge_df[merge_df['income_quartile'] == quartile])
+    count = len(merge_df[merge_df['demographic_quartile'] == quartile])
     ws.cell(row=current_row + 1, column=col_idx, value=str(count))
 
 # %%
 # Add characteristic means row
-ws.cell(row=current_row + 2, column=1, value="Mean Income ($1000s)")
+ws.cell(row=current_row + 2, column=1, value="Mean % Black/Hispanic")
 ws.cell(row=current_row + 2, column=1).font = Font(bold=False)
 
 for col_idx, quartile in enumerate(quartile_labels, 2):
-    quartile_data = merge_df[merge_df['income_quartile'] == quartile]
-    mean_characteristic = quartile_data['medinc_1000'].mean() * 1000 if len(quartile_data) > 0 else np.nan
-    ws.cell(row=current_row + 2, column=col_idx,
-            value=f"${mean_characteristic:,.0f}K" if not np.isnan(mean_characteristic) else "N/A")
+    quartile_data = merge_df[merge_df['demographic_quartile'] == quartile]
+    if len(quartile_data) > 0:
+        mean_characteristic = quartile_data['percent_race_black_hispanic'].mean()
+        ws.cell(row=current_row + 2, column=col_idx, value=f"{mean_characteristic:.1f}%")
+    else:
+        ws.cell(row=current_row + 2, column=col_idx, value="N/A")
 
 # %%
 # Save Excel results
-output_path = start.RESULTS_DIR + 'Table10_income_quartiles.xlsx'
+output_path = start.RESULTS_DIR + 'AppendixB3_demographic_quartiles.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")
 
@@ -233,5 +232,5 @@ print(f"Number of districts analyzed: {len(merge_df)}")
 print(f"Number of topics analyzed: {len(ordered_topics)}")
 print("\nQuartile distribution:")
 for quartile in quartile_labels:
-    count = len(merge_df[merge_df['income_quartile'] == quartile])
+    count = len(merge_df[merge_df['demographic_quartile'] == quartile])
     print(f"  {quartile}: {count} districts")

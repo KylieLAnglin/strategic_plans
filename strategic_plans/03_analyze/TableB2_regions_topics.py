@@ -16,18 +16,6 @@ print(f"Analyzing {len(top_topics_df)} topics")
 print(f"Number of districts: {len(merge_df)}")
 
 # %%
-# Create quartiles based on mean_test_score
-merge_df['score_quartile'] = pd.qcut(merge_df['mean_test_score'], 
-                                    q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
-
-# Print quartile ranges
-print("\nTest Score Quartiles:")
-quartile_stats = merge_df.groupby('score_quartile')['mean_test_score'].agg(['min', 'max', 'mean', 'count'])
-for quartile in ['Q1', 'Q2', 'Q3', 'Q4']:
-    stats = quartile_stats.loc[quartile]
-    print(f"{quartile}: {stats['min']:.2f} - {stats['max']:.2f} (mean: {stats['mean']:.2f}, n={stats['count']})")
-
-# %%
 # Create combined Academic Achievement topic (Topic_9 + Topic_16)
 merge_df['Academic_Achievement'] = merge_df['Topic_9'] + merge_df['Topic_16']
 
@@ -54,10 +42,10 @@ ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
 # Create results workbook
 wb = Workbook()
 ws = wb.active
-ws.title = "Score Quartiles Topic Analysis"
+ws.title = "Regional Topic Analysis"
 
 # Set up headers
-headers = ["Topic", "Q1", "Q2", "Q3", "Q4", "Adj P-value"]
+headers = ["Topic", "Northeast", "Midwest", "West", "South", "Adj P-value"]
 for col, header in enumerate(headers, 1):
     ws.cell(row=1, column=col, value=header)
     ws.cell(row=1, column=col).font = Font(bold=True)
@@ -67,7 +55,7 @@ for col, header in enumerate(headers, 1):
 all_topic_groups = []
 p_values = []
 topic_results = []
-quartile_labels = ['Q1', 'Q2', 'Q3', 'Q4']
+region_cols = ["northeast", "midwest", "west", "south"]
 
 # First pass: collect all p-values
 for topic_code in ordered_topics:
@@ -79,28 +67,28 @@ for topic_code in ordered_topics:
     topic_id = topic_row.iloc[0]['Topic ID']
     topic_name = topic_row.iloc[0]['Topic Code']
 
-    # Dictionary to store raw values by quartile
-    quartile_data_dict = {}
+    # Dictionary to store raw values by region
+    region_data_dict = {}
 
-    for quartile in quartile_labels:
-        group_df = merge_df[merge_df['score_quartile'] == quartile]
+    for region in region_cols:
+        group_df = merge_df[merge_df[region] == 1]
         values = group_df[topic_id].values if len(group_df) > 0 else np.array([])
-        quartile_data_dict[quartile] = values
+        region_data_dict[region] = values
 
     # Calculate means and standard deviations
     means = {}
     stds = {}
-    for quartile in quartile_labels:
-        vals = quartile_data_dict[quartile]
+    for region in region_cols:
+        vals = region_data_dict[region]
         mean_val = np.nan if len(vals) == 0 else np.nanmean(vals)
         std_val = np.nan if len(vals) == 0 else np.nanstd(vals, ddof=1)
-        means[quartile] = mean_val
-        stds[quartile] = std_val
+        means[region] = mean_val
+        stds[region] = std_val
 
     # Perform ANOVA
     valid_groups = [
         pd.Series(vals).dropna().values
-        for vals in quartile_data_dict.values()
+        for vals in region_data_dict.values()
         if pd.Series(vals).dropna().shape[0] > 0
     ]
     
@@ -123,8 +111,8 @@ for topic_code in ordered_topics:
 
     # Build long-form DataFrame for this topic
     topic_long_df = pd.DataFrame([
-        {"quartile": q, "value": v, "topic": topic_code}
-        for q, vals in quartile_data_dict.items()
+        {"region": r, "value": v, "topic": topic_code}
+        for r, vals in region_data_dict.items()
         for v in vals
     ])
     all_topic_groups.append(topic_long_df)
@@ -153,8 +141,8 @@ for i, result in enumerate(topic_results):
     ws.cell(row=row, column=1).font = Font(bold=False)
 
     # Add means to Excel
-    for col_idx, quartile in enumerate(quartile_labels, 2):
-        mean_val = result['means'][quartile]
+    for col_idx, region in enumerate(region_cols, 2):
+        mean_val = result['means'][region]
         ws.cell(row=row, column=col_idx,
                 value=f"{mean_val:.2f}" if not np.isnan(mean_val) else "N/A")
 
@@ -177,8 +165,8 @@ for i, result in enumerate(topic_results):
 
     # Add standard deviation row in brackets
     ws.cell(row=row, column=1, value="")
-    for col_idx, quartile in enumerate(quartile_labels, 2):
-        std_val = result['stds'][quartile]
+    for col_idx, region in enumerate(region_cols, 2):
+        std_val = result['stds'][region]
         ws.cell(row=row, column=col_idx,
                 value=f"[{std_val:.2f}]" if not np.isnan(std_val) else "[N/A]")
     
@@ -198,26 +186,13 @@ for group_name, topics in TOPIC_GROUPS:
 ws.cell(row=current_row + 1, column=1, value="Sample Size (N)")
 ws.cell(row=current_row + 1, column=1).font = Font(bold=False)
 
-for col_idx, quartile in enumerate(quartile_labels, 2):
-    count = len(merge_df[merge_df['score_quartile'] == quartile])
+for col_idx, region in enumerate(region_cols, 2):
+    count = len(merge_df[merge_df[region] == 1])
     ws.cell(row=current_row + 1, column=col_idx, value=str(count))
 
 # %%
-# Add characteristic means row
-ws.cell(row=current_row + 2, column=1, value="Mean Test Score")
-ws.cell(row=current_row + 2, column=1).font = Font(bold=False)
-
-for col_idx, quartile in enumerate(quartile_labels, 2):
-    quartile_data = merge_df[merge_df['score_quartile'] == quartile]
-    if len(quartile_data) > 0:
-        mean_characteristic = quartile_data['mean_test_score'].mean()
-        ws.cell(row=current_row + 2, column=col_idx, value=f"{mean_characteristic:.2f}")
-    else:
-        ws.cell(row=current_row + 2, column=col_idx, value="N/A")
-
-# %%
 # Save Excel results
-output_path = start.RESULTS_DIR + 'Table9_score_quartiles.xlsx'
+output_path = start.RESULTS_DIR + 'AppendixB2_regions_topics.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")
 
@@ -227,7 +202,7 @@ print(f"\nTable exported to {output_path}")
 print("\nSummary Statistics:")
 print(f"Number of districts analyzed: {len(merge_df)}")
 print(f"Number of topics analyzed: {len(ordered_topics)}")
-print("\nQuartile distribution:")
-for quartile in quartile_labels:
-    count = len(merge_df[merge_df['score_quartile'] == quartile])
-    print(f"  {quartile}: {count} districts")
+print("Regional distribution:")
+for region in region_cols:
+    count = len(merge_df[merge_df[region] == 1])
+    print(f"  {region.capitalize()}: {count} districts")

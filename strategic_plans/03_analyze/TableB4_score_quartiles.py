@@ -15,20 +15,17 @@ merge_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_an
 print(f"Analyzing {len(top_topics_df)} topics")
 print(f"Number of districts: {len(merge_df)}")
 
-# Scale percentage variable to 0-100 scale if needed
-merge_df["percent_race_black_hispanic"] = merge_df["percent_race_black_hispanic"] * 100
-
 # %%
-# Create quartiles based on percent_race_black_hispanic
-merge_df['demographic_quartile'] = pd.qcut(merge_df['percent_race_black_hispanic'], 
-                                          q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
+# Create quartiles based on mean_test_score
+merge_df['score_quartile'] = pd.qcut(merge_df['mean_test_score'], 
+                                    q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
 
 # Print quartile ranges
-print("\nDemographic Quartiles (% Black/Hispanic):")
-quartile_stats = merge_df.groupby('demographic_quartile')['percent_race_black_hispanic'].agg(['min', 'max', 'mean', 'count'])
+print("\nTest Score Quartiles:")
+quartile_stats = merge_df.groupby('score_quartile')['mean_test_score'].agg(['min', 'max', 'mean', 'count'])
 for quartile in ['Q1', 'Q2', 'Q3', 'Q4']:
     stats = quartile_stats.loc[quartile]
-    print(f"{quartile}: {stats['min']:.1f}% - {stats['max']:.1f}% (mean: {stats['mean']:.1f}%, n={stats['count']})")
+    print(f"{quartile}: {stats['min']:.2f} - {stats['max']:.2f} (mean: {stats['mean']:.2f}, n={stats['count']})")
 
 # %%
 # Create combined Academic Achievement topic (Topic_9 + Topic_16)
@@ -57,7 +54,7 @@ ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
 # Create results workbook
 wb = Workbook()
 ws = wb.active
-ws.title = "Demographic Quartiles Topic Analysis"
+ws.title = "Score Quartiles Topic Analysis"
 
 # Set up headers
 headers = ["Topic", "Q1", "Q2", "Q3", "Q4", "Adj P-value"]
@@ -86,7 +83,7 @@ for topic_code in ordered_topics:
     quartile_data_dict = {}
 
     for quartile in quartile_labels:
-        group_df = merge_df[merge_df['demographic_quartile'] == quartile]
+        group_df = merge_df[merge_df['score_quartile'] == quartile]
         values = group_df[topic_id].values if len(group_df) > 0 else np.array([])
         quartile_data_dict[quartile] = values
 
@@ -202,25 +199,25 @@ ws.cell(row=current_row + 1, column=1, value="Sample Size (N)")
 ws.cell(row=current_row + 1, column=1).font = Font(bold=False)
 
 for col_idx, quartile in enumerate(quartile_labels, 2):
-    count = len(merge_df[merge_df['demographic_quartile'] == quartile])
+    count = len(merge_df[merge_df['score_quartile'] == quartile])
     ws.cell(row=current_row + 1, column=col_idx, value=str(count))
 
 # %%
 # Add characteristic means row
-ws.cell(row=current_row + 2, column=1, value="Mean % Black/Hispanic")
+ws.cell(row=current_row + 2, column=1, value="Mean Test Score")
 ws.cell(row=current_row + 2, column=1).font = Font(bold=False)
 
 for col_idx, quartile in enumerate(quartile_labels, 2):
-    quartile_data = merge_df[merge_df['demographic_quartile'] == quartile]
+    quartile_data = merge_df[merge_df['score_quartile'] == quartile]
     if len(quartile_data) > 0:
-        mean_characteristic = quartile_data['percent_race_black_hispanic'].mean()
-        ws.cell(row=current_row + 2, column=col_idx, value=f"{mean_characteristic:.1f}%")
+        mean_characteristic = quartile_data['mean_test_score'].mean()
+        ws.cell(row=current_row + 2, column=col_idx, value=f"{mean_characteristic:.2f}")
     else:
         ws.cell(row=current_row + 2, column=col_idx, value="N/A")
 
 # %%
 # Save Excel results
-output_path = start.RESULTS_DIR + 'Table8_demographic_quartiles.xlsx'
+output_path = start.RESULTS_DIR + 'AppendixB4_score_quartiles.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")
 
@@ -232,5 +229,5 @@ print(f"Number of districts analyzed: {len(merge_df)}")
 print(f"Number of topics analyzed: {len(ordered_topics)}")
 print("\nQuartile distribution:")
 for quartile in quartile_labels:
-    count = len(merge_df[merge_df['demographic_quartile'] == quartile])
+    count = len(merge_df[merge_df['score_quartile'] == quartile])
     print(f"  {quartile}: {count} districts")

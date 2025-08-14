@@ -192,7 +192,7 @@ for col_idx, urbanicity in enumerate(urbanicity_cols, 2):
 
 # %%
 # Save Excel results
-output_path = start.RESULTS_DIR + 'Table6_urbanicity_topics.xlsx'
+output_path = start.RESULTS_DIR + 'AppendixB1_urbanicity_topics.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")
 
