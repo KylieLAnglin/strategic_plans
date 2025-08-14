@@ -47,7 +47,7 @@ TOPIC_GROUPS = [
     ("Academic Topics", ["Topic_1", "Topic_8", "Academic_Achievement"]),
     ("Non-Academic Outcomes", ["Topic_3", "Topic_5", "Topic_12", "Topic_14"]),
     ("Family and Community", ["Topic_17", "Topic_20"]),
-    ("Mechanisms", ["Topic_0", "Topic_22", "Topic_15"])
+    ("Mechanisms", ["Topic_0", "Topic_22"])
 ]
 
 # Flatten topic list in the desired order
@@ -194,7 +194,7 @@ for group_name, topics in TOPIC_GROUPS:
     ws.insert_rows(current_row)
     ws.cell(row=current_row, column=1, value=group_name)
     ws.cell(row=current_row, column=1).font = Font(bold=True, italic=True)
-    current_row += 1 + len(topics)
+    current_row += 1 + (len(topics) * 2)  # Each topic takes 2 rows (mean + std dev)
 
 # %%
 # Add sample sizes row at the end

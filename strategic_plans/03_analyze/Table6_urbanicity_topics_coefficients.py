@@ -35,7 +35,7 @@ TOPIC_GROUPS = [
     ("Academic Topics", ["Topic_1", "Topic_8", "Academic_Achievement"]),
     ("Non-Academic Outcomes", ["Topic_3", "Topic_5", "Topic_12", "Topic_14"]),
     ("Family and Community", ["Topic_17", "Topic_20"]),
-    ("Mechanisms", ["Topic_0", "Topic_22", "Topic_15"])
+    ("Mechanisms", ["Topic_0", "Topic_22"])
 ]
 
 # Flatten topic list in the desired order
@@ -68,7 +68,7 @@ for topic_code in ordered_topics:
     topic_name = topic_row.iloc[0]['Topic Code']
 
     # Run regression with state fixed effects (urban is reference category by default)
-    formula = f"{topic_id} ~ C(urbanicity, Treatment(reference='urban')) + C(state) + improvement_plan + word_count"
+    formula = f"{topic_id} ~ C(urbanicity, Treatment(reference='urban')) + C(state) + improvement_plan + form_plan + word_count"
     model = smf.ols(formula, data=merge_df, missing='drop').fit()
     
     # Calculate mean prevalence for reference group (urban)

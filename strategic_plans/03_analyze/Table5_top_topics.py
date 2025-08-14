@@ -49,7 +49,7 @@ table_df = table_df.sort_values('avg_prevalence', ascending=False)
 word_cols = [f'Word {i+1}' for i in range(10)]  # Word columns are now named 'Word 1' through 'Word 10'
 available_word_cols = [col for col in word_cols if col in table_df.columns]
 
-columns_to_include = ['topic_id', 'code', 'avg_prevalence', 'parent_code'] + available_word_cols
+columns_to_include = ['topic_id', 'code', 'parent_code', 'avg_prevalence'] + available_word_cols
 final_table = table_df[columns_to_include].copy()
 
 # Create rename dictionary
@@ -62,6 +62,9 @@ rename_dict = {
 
 # Word columns are already properly named, so no need to rename them
 final_table = final_table.rename(columns=rename_dict)
+
+# Round Average Prevalence to two decimal places
+final_table['Average Prevalence'] = final_table['Average Prevalence'].round(2)
 
 # %%
 # Export table
