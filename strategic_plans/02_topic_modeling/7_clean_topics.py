@@ -31,7 +31,7 @@ doc_topics_df = pd.read_csv(doc_topics_path)
 docs_df = pd.read_pickle(docs_path)
 # %%
 # Find top 5 documents with highest Topic XX prevalence
-TOPIC = '1'
+TOPIC = '5'
 
 top_topic_docs = doc_topics_df.nlargest(20, TOPIC)[['doc_id', TOPIC]]
 

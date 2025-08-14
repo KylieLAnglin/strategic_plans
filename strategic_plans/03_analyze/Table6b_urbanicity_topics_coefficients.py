@@ -68,7 +68,7 @@ for topic_code in ordered_topics:
     topic_name = topic_row.iloc[0]['Topic Code']
 
     # Run regression with state fixed effects (urban is reference category by default)
-    formula = f"{topic_id} ~ C(urbanicity, Treatment(reference='urban')) + C(state) + improvement_plan + form_plan"
+    formula = f"{topic_id} ~ C(urbanicity, Treatment(reference='urban')) + C(state) + improvement_plan + word_count"
     model = smf.ols(formula, data=merge_df, missing='drop').fit()
     
     # Calculate mean prevalence for reference group (urban)

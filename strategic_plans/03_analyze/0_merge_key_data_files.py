@@ -21,6 +21,7 @@ sample_inclusion_df = pd.read_excel(INPUT_SAMPLE_INCLUSION_DF) # merge options: 
 labelled_plans_df = pd.read_excel(INPUT_LABELLED_PLANS_DF) # merge options: leaid, lea_name, pdf_name
 
 
+text_df["word_count"] = text_df["text"].apply(lambda x: len(str(x).split()))  # Count words in text
 # %% Clean topic df
 # add "topic_" prefix to column names other than district
 topic_df.columns = ["district"] + [f"Topic_{col}" for col in topic_df.columns[1:]]
@@ -77,6 +78,8 @@ df.sample()
 labelled_plans_df = labelled_plans_df[["leaid", "improvement_plan", "form_plan" ]]
 df = df.merge(labelled_plans_df, on="leaid", how='left')
 
+# bring in word count
+df = df.merge(text_df[["leaid", "word_count"]], on="leaid", how='left')
 # %%
 # count if in both model and human sample
 in_both = df[(df.in_model_sample == 1) & (df.in_human_sample == 1)]

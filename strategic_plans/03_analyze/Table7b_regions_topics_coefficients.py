@@ -76,7 +76,7 @@ for topic_code in ordered_topics:
     northeast_mean = northeast_data[topic_id].mean()
     
     # Run regression (northeast is reference category by default)
-    formula = f"{topic_id} ~ C(region_cat, Treatment(reference='northeast')) + improvement_plan + form_plan"
+    formula = f"{topic_id} ~ C(region_cat, Treatment(reference='northeast')) + improvement_plan + form_plan + word_count"
     model = smf.ols(formula, data=merge_df, missing='drop').fit()
     
     # Extract coefficients and standard errors for non-reference categories (Northeast is omitted)

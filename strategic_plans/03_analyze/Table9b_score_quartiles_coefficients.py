@@ -81,7 +81,7 @@ for topic_code in ordered_topics:
     q1_mean = q1_data[topic_id].mean()
     
     # Run regression with state fixed effects (Q1 is reference category by default)
-    formula = f"{topic_id} ~ C(score_quartile) + C(state) + improvement_plan + form_plan"
+    formula = f"{topic_id} ~ C(score_quartile) + C(state) + improvement_plan + form_plan + word_count"
     model = smf.ols(formula, data=merge_df, missing='drop').fit()
 
     # Extract coefficients and standard errors for non-reference categories
