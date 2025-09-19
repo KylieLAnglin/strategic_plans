@@ -139,10 +139,11 @@ for missing in null_titles[:5]:
 
 goal_count[["code_title",  "count_plans", "proportion", "all_districts_rank", "code_description",]].to_excel(start.MAIN_DIR + "results/goal_count.xlsx")
 # %%
-
+# code_community_connection_and_buy_in_applied
+#  "code_parent_communication_and_involvement_applied" delete?
 # %%
 # list 5 documents with goal of interest
-goal_of_interest = "code_climate_culture_and_belonging_applied"
+goal_of_interest = "code_providing_community_and_parent_resources_applied"
 goal_docs = df[df[goal_of_interest] > 0].sample(5)
 print(f"Documents with goal '{goal_of_interest}':")
 for index, row in goal_docs.iterrows():

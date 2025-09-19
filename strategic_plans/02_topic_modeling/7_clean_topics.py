@@ -2,12 +2,13 @@
 import pandas as pd
 import os
 from strategic_plans.library import start
-
+import numpy as np
 # %%
 topics_path = start.DATA_DIR + 'final_model/topic_model/topics.csv'
 output_path = start.DATA_DIR + 'final_model/topic_naming.xlsx'
 doc_topics_path = start.DATA_DIR + 'final_model/topic_model/doc_topics.csv'
 docs_path = start.DATA_DIR + 'final_model/final_token_dfs_w_chunks.pkl'
+meta_data_path = start.DATA_DIR + "clean/meta_data_df.csv"
 # %%
 topics_df = pd.read_csv(topics_path)
 word_cols = [col for col in topics_df.columns if col.startswith('Word_')]
@@ -29,11 +30,13 @@ doc_topics_df = pd.read_csv(doc_topics_path)
 
 # Load token data with document text
 docs_df = pd.read_pickle(docs_path)
+meta_data_df = pd.read_csv(meta_data_path)
+docs_df = docs_df.merge(meta_data_df[['doc_id', 'district_id']], on='doc_id', how='left')
 # %%
 # Find top 5 documents with highest Topic XX prevalence
-TOPIC = '5'
+TOPIC = '17'
 
-top_topic_docs = doc_topics_df.nlargest(20, TOPIC)[['doc_id', TOPIC]]
+top_topic_docs = doc_topics_df.nlargest(50, TOPIC)[['doc_id', TOPIC]]
 
 print(f"Top 5 documents with highest Topic {TOPIC} prevalence:")
 for idx, row in top_topic_docs.iterrows():
@@ -49,6 +52,5 @@ for idx, row in top_topic_docs.iterrows():
     else:
         print(f"\nDoc ID: {doc_id} (text not found)")
         print(f"Topic {TOPIC} Prevalence: {prevalence:.4f}")
-
 
 # %%

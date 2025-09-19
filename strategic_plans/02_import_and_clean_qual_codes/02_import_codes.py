@@ -50,7 +50,6 @@ codebook_df["code"] = codebook_df["code"].str.strip("_")
 codebook_df["code"] = codebook_df.code.str.lower()
 codebook_df = codebook_df.set_index("Id")
 
-# Debug: Print some examples of code cleaning
 print("Examples of code name cleaning:")
 for i, (idx, row) in enumerate(codebook_df.head(10).iterrows()):
     print(f"  {row.get('Title', 'N/A')} -> {row['code']}")
@@ -82,6 +81,7 @@ long_df = meta_data_df.merge(
 long_df = long_df[long_df.complete_qual == 1]
 long_df = long_df[long_df.include_qual == 1]
 
+print(f"After filtering, {long_df.leaid.nunique()} districts with qualitative coding data")
 
 # %% Clean column names
 # Standardize column names: remove 'Code: ' prefix and convert to lowercase
@@ -134,10 +134,10 @@ print(f"Converted {len(applied_cols)} applied columns to binary format")
 # Address problem with parent and community codes
 
 PARENT_CODE_FILE = start.DATA_DIR + "clean/plans_codes_previous_parent_and_community.csv"
-correct_parent_codes = pd.read_csv(PARENT_CODE_FILE)
-
-
 KEEP_COLUMNS = ["leaid", "code_family_and_community_community_connection_and_buy_in_applied", "code_family_and_community_parent_communication_and_involvement_applied"]
+
+correct_parent_codes = pd.read_csv(PARENT_CODE_FILE)
+correct_parent_codes = correct_parent_codes[KEEP_COLUMNS]
 # Merge correct parent codes back into final dataset
 df_final = df_final.merge(correct_parent_codes[KEEP_COLUMNS], on="leaid", how="left")
 df_final = df_final.rename(
@@ -147,9 +147,14 @@ df_final = df_final.rename(
     }
 )
 
+# "code_parent_communication_and_involvement_applied" delete?
 
 df_final["code_community_connection_and_buy_in_applied"] = np.where(df_final["code_zz_merge_community_economic_development_applied"] == 1, 1, df_final["code_community_connection_and_buy_in_applied"])
-CODES_TO_REMOVE = ["code_zz_delete_family_and_community_applied", "code_zz_delete_new_community_connection_and_buy_in_applied", "code_parent_communication_and_involvement_applied", "code_zz_merge_community_economic_development_applied", "code_other_unknown_applied", "code_old_community_connection_and_buy_in_applied"]
+CODES_TO_REMOVE = ["code_zz_delete_family_and_community_applied", 
+                   "code_zz_delete_new_community_connection_and_buy_in_applied", 
+                   "code_zz_merge_community_economic_development_applied", 
+                   "code_other_unknown_applied", 
+                   "code_old_community_connection_and_buy_in_applied"]
 
 df_final = df_final.drop(columns=CODES_TO_REMOVE, errors="ignore")
 

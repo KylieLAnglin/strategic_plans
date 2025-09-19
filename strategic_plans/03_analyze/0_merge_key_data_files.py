@@ -12,6 +12,7 @@ INPUT_TOPIC_DF = start.DATA_DIR + "final_model/topic_model/doc_topics_grouped.xl
 INPUT_CSV_META_DATA_DF = start.DATA_DIR + "clean/meta_data_df.csv"
 INPUT_SAMPLE_INCLUSION_DF = start.DATA_DIR + "sample_inclusion.xlsx"
 INPUT_LABELLED_PLANS_DF = start.DATA_DIR + "clean/sample_inclusion_with_topics_labeled.xlsx"
+
 sample_df = pd.read_csv(INPUT_SAMPLE_DF) # merge options: leaid, district (all caps)
 text_df = pd.read_csv(INPUT_TEXT_DF) # merge options: leaid, lea_name (mixed caps), pdf_name (mixed_caps)
 code_df = pd.read_csv(INPUT_CODE_DF) # merge options: leaid, lea_name (mixed caps), dedoose_name (mixed caps)
@@ -80,6 +81,46 @@ df = df.merge(labelled_plans_df, on="leaid", how='left')
 
 # bring in word count
 df = df.merge(text_df[["leaid", "word_count"]], on="leaid", how='left')
+
+# %%
+# Add normalized topic prevalence columns
+# Load topic naming to identify included topics (same approach as Table5b)
+topic_naming_path = start.DATA_DIR + 'final_model/topic_naming_named.xlsx'
+topic_naming_df = pd.read_excel(topic_naming_path)
+topic_naming_df = topic_naming_df.rename(columns={'Unnamed: 0': 'topic_id'})
+
+# Identify included topics (exclude uninterpretable / document details)
+excluded_parent_codes = {"Uninterpretable", "Document Details"}
+included_topics_meta = topic_naming_df[~topic_naming_df['parent_code'].isin(excluded_parent_codes)]
+
+# Get topic columns and filter to included ones
+topic_cols = [col for col in df.columns if col.startswith('Topic_')]
+included_topic_cols = [col for col in topic_cols if col in included_topics_meta['topic_id'].tolist()]
+
+print(f"Total topic columns: {len(topic_cols)}")
+print(f"Included topic columns: {len(included_topic_cols)}")
+print(f"Excluded topics: {[col for col in topic_cols if col not in included_topic_cols]}")
+
+# Normalize: for each row, divide each included topic by sum of included topics
+# Only normalize rows that have topic data (in_model_sample == 1)
+rows_with_topics = df['in_model_sample'] == 1
+
+included_values = df.loc[rows_with_topics, included_topic_cols].apply(pd.to_numeric, errors='coerce')
+row_sums = included_values.sum(axis=1)
+
+# Avoid division by zero: where sum==0, keep NaNs
+normalized_topics = included_values.div(row_sums.replace(0, np.nan), axis=0)
+
+# Add normalized columns with _norm suffix
+for col in included_topic_cols:
+    df[f"{col}_norm"] = np.nan  # Initialize with NaN for all rows
+    df.loc[rows_with_topics, f"{col}_norm"] = normalized_topics[col]
+
+print(f"Added {len(included_topic_cols)} normalized topic columns with '_norm' suffix")
+print("Sample normalized values:")
+norm_cols = [f"{col}_norm" for col in included_topic_cols[:3]]  # Show first 3 for verification
+print(df[rows_with_topics][norm_cols].head())
+
 # %%
 # count if in both model and human sample
 in_both = df[(df.in_model_sample == 1) & (df.in_human_sample == 1)]

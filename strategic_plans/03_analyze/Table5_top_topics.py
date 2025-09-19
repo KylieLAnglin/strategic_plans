@@ -3,75 +3,107 @@ import pandas as pd
 import numpy as np
 from strategic_plans.library import start
 
-# %%
-# Load topic naming data with codes
+# ------------------ Load inputs ------------------
+# Topic naming (with human labels, parent codes, and top words)
 topic_naming_path = start.DATA_DIR + 'final_model/topic_naming_named.xlsx'
 topic_naming_df = pd.read_excel(topic_naming_path)
-# rename 0-9 columns to Word 1-10
-word_cols = [i for i in range(10)]  # Word columns are simply '0' through '9'
-rename_dict = {col: f'Word {i+1}' for i, col in enumerate(word_cols)}
-topic_naming_df = topic_naming_df.rename(columns=rename_dict)
-topic_naming_df = topic_naming_df.rename(columns={'Unnamed: 0': 'topic_id'})
 
-# Load document-topic prevalence data (grouped by district/strategic plan)
+# Rename word columns 0..9 -> Word 1..10 and the id column
+word_cols_raw = [i for i in range(10)]
+topic_naming_df = topic_naming_df.rename(columns={c: f'Word {i+1}' for i, c in enumerate(word_cols_raw)})
+topic_naming_df = topic_naming_df.rename(columns={'Unnamed: 0': 'topic_id'})  # e.g., "Topic_0"
+
+# Document-topic prevalence (grouped by district/plan)
 doc_topics_path = start.DATA_DIR + 'final_model/topic_model/doc_topics_grouped.xlsx'
 doc_topics_df = pd.read_excel(doc_topics_path)
-# rename 0-22 columns to Topic 1-23
-topic_cols = [str(i) for i in range(23)]  # Assuming topics are numbered 0-22
-rename_dict = {col: f'Topic {int(col)}' for col in topic_cols}
-doc_topics_df = doc_topics_df.rename(columns=rename_dict)
-# %%
-# Calculate average prevalence for each topic across all documents
-topic_prevalence = []
 
-for topic_id in topic_naming_df['topic_id']:
-    topic_id = topic_id.replace("_", " ")
-    avg_prevalence = doc_topics_df[topic_id].mean()
-    topic_prevalence.append({
-        'topic_id': topic_id.replace(" ", "_"),
-        'avg_prevalence': avg_prevalence
+# The topic columns arrive as strings "0".."22"; rename to "Topic 0".."Topic 22" to align to naming (with a space)
+topic_cols = [str(i) for i in range(23)]  # adjust if your model has a different # of topics
+doc_topics_df = doc_topics_df.rename(columns={c: f"Topic {int(c)}" for c in topic_cols})
+
+# ------------------ Identify included topics ------------------
+# Exclude uninterpretable / document details
+excluded_parent_codes = {"Uninterpretable", "Document Details"}
+
+# topic_naming_df['topic_id'] uses underscores: "Topic_0". Convert to space-form to match doc_topics_df columns.
+topic_naming_df['topic_id_space'] = topic_naming_df['topic_id'].str.replace("_", " ", regex=False)
+
+included_topics_meta = topic_naming_df[~topic_naming_df['parent_code'].isin(excluded_parent_codes)].copy()
+
+# Keep only topics present in doc_topics_df
+included_topic_cols = [t for t in included_topics_meta['topic_id_space'].tolist() if t in doc_topics_df.columns]
+
+# ------------------ Row-normalize to proportion of INCLUDED topics ------------------
+# For each row/document, compute the sum across included topics, then divide each included topic by that sum.
+# This yields per-row proportions that sum to 1 over INCLUDED topics (rows with zero-sum become NaN).
+included_values = doc_topics_df[included_topic_cols].apply(pd.to_numeric, errors='coerce')
+row_sums = included_values.sum(axis=1)
+
+# Avoid division by zero: where sum==0, keep NaNs
+normalized = included_values.div(row_sums.replace(0, np.nan), axis=0)
+
+# ------------------ Aggregate normalized prevalence per topic ------------------
+# Compute mean, 25th percentile, and 75th percentile of normalized prevalence across documents.
+topic_summary = []
+for col in included_topic_cols:
+    col_series = pd.to_numeric(normalized[col], errors='coerce').dropna()
+    if col_series.empty:
+        avg = p25 = p75 = np.nan
+    else:
+        avg = col_series.mean()
+        p25 = col_series.quantile(0.25)
+        p75 = col_series.quantile(0.75)
+
+    # Convert back to underscore id to merge with naming
+    topic_id_under = col.replace(" ", "_")
+    topic_summary.append({
+        'topic_id': topic_id_under,
+        'avg_norm_prevalence': avg,
+        'p25_norm_prevalence': p25,
+        'p75_norm_prevalence': p75
     })
 
-prevalence_df = pd.DataFrame(topic_prevalence)
+summary_df = pd.DataFrame(topic_summary)
 
-# %%
-# Merge with topic naming data
-table_df = prevalence_df.merge(topic_naming_df, left_on='topic_id', right_on='topic_id', how='left')
+# ------------------ Merge with names / codes / words ------------------
+table_df = summary_df.merge(topic_naming_df, on='topic_id', how='left')
 
-# Filter out excluded parent codes
-excluded_parent_codes = ["Uninterpretable", "Document Details"]
+# Filter again for safety (keep only included parent codes)
 table_df = table_df[~table_df['parent_code'].isin(excluded_parent_codes)]
 
-# Sort by decreasing prevalence
-table_df = table_df.sort_values('avg_prevalence', ascending=False)
+# Sort by decreasing normalized average prevalence
+table_df = table_df.sort_values('avg_norm_prevalence', ascending=False)
 
-# Select and rename columns for final table (including top 10 words)
-word_cols = [f'Word {i+1}' for i in range(10)]  # Word columns are now named 'Word 1' through 'Word 10'
-available_word_cols = [col for col in word_cols if col in table_df.columns]
+# Columns to include in the final table
+word_cols = [f'Word {i+1}' for i in range(10)]
+available_word_cols = [c for c in word_cols if c in table_df.columns]
 
-columns_to_include = ['topic_id', 'code', 'parent_code', 'avg_prevalence'] + available_word_cols
-final_table = table_df[columns_to_include].copy()
+final_cols = (
+    ['topic_id', 'code', 'parent_code',
+     'avg_norm_prevalence', 'p25_norm_prevalence', 'p75_norm_prevalence']
+    + available_word_cols
+)
+final_table = table_df[final_cols].copy()
 
-# Create rename dictionary
-rename_dict = {
+# Nicely rename for output
+final_table = final_table.rename(columns={
     'topic_id': 'Topic ID',
-    'code': 'Topic Code', 
-    'avg_prevalence': 'Average Prevalence',
-    'parent_code': 'Parent Code'
-}
+    'code': 'Topic Code',
+    'parent_code': 'Parent Code',
+    'avg_norm_prevalence': 'Average Normalized Prevalence',
+    'p25_norm_prevalence': '25th Percentile (Normalized)',
+    'p75_norm_prevalence': '75th Percentile (Normalized)',
+})
 
-# Word columns are already properly named, so no need to rename them
-final_table = final_table.rename(columns=rename_dict)
+# Optional: round to two decimals (keep as proportions 0–1; use *100 if you prefer percentages)
+for c in ['Average Normalized Prevalence', '25th Percentile (Normalized)', '75th Percentile (Normalized)']:
+    final_table[c] = final_table[c].round(4)
 
-# Round Average Prevalence to two decimal places
-final_table['Average Prevalence'] = final_table['Average Prevalence'].round(2)
-
-# %%
-# Export table
-output_path = start.RESULTS_DIR + 'top_topics.xlsx'
+# ------------------ Export ------------------
+output_path = start.RESULTS_DIR + 'top_topics_normalized_to_included.xlsx'
 final_table.to_excel(output_path, index=False)
 
-print(f"Table 5 exported to {output_path}")
-print(f"Number of topics included: {len(final_table)}")
-print(f"Top 5 topics by prevalence:")
-print(final_table.head()[['Topic Code', 'Average Prevalence']].to_string(index=False))
+print(f"Exported normalized table to {output_path}")
+print(f"Included topics: {len(included_topic_cols)} / total topics in file: {len(doc_topics_df.columns)}")
+print(final_table.head(10)[['Topic Code', 'Average Normalized Prevalence',
+                            '25th Percentile (Normalized)', '75th Percentile (Normalized)']].to_string(index=False))
