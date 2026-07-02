@@ -2,7 +2,11 @@
 numpy
 pandas
 ipykernel
-
+scikit-learn
+matplotlib
+openpyxl
+statsmodels
+tqdm
 # formatting
 black
 

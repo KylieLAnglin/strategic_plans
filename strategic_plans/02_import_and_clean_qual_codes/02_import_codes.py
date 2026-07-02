@@ -22,19 +22,18 @@ import numpy as np
 meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/dedoose_doc_df.csv")
 
 # %% Load Dedoose exports
-# Import the latest Dedoose chart excerpts (contains actual coded data)
-# FILENAME = "DedooseChartExcerpts_2025_7_21_1137.xlsx"
-# FILENAME = "DedooseChartExcerpts_2025_8_2_713.xlsx"
-FILENAME = "DedooseChartExcerpts_2025_8_6_853.xlsx"
-code_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
+# Import the latest Dedoose chart excerpts (contains actual coded data);
+# current export files are pinned in library/start.py
+code_df = pd.read_excel(start.LATEST_CHART_EXPORT)
 print(f"Number of unique media titles in code data: {code_df['Media Title'].nunique()}")
 
 # Import the codebook (contains code definitions and hierarchy)
-# FILENAME = "DedooseCodesExport_2025_7_21_1132.xlsx"
-FILENAME = "DedooseCodesExport_2025_8_2_721.xlsx"
-print(f"Number of unique codes in codebook: {len(pd.read_excel(start.MAIN_DIR + 'data/raw/Dedoose Exports/' + FILENAME))}")
+codebook_df = pd.read_excel(start.LATEST_CODEBOOK_EXPORT)
+print(f"Number of unique codes in codebook: {len(codebook_df)}")
 
-codebook_df = pd.read_excel(start.MAIN_DIR + "data/raw/Dedoose Exports/" + FILENAME)
+# Import the crosswalk: the codebook of record mapping each analyzed code
+# column to its display name, top-level code, and type (goal vs subgroup)
+crosswalk_df = pd.read_excel(start.CROSSWALK_FILE)
 
 # %% Process codebook for clean code names
 # Define patterns to standardize code names (spaces, punctuation, etc. become underscores)
@@ -138,6 +137,14 @@ KEEP_COLUMNS = ["leaid", "code_family_and_community_community_connection_and_buy
 
 correct_parent_codes = pd.read_csv(PARENT_CODE_FILE)
 correct_parent_codes = correct_parent_codes[KEEP_COLUMNS]
+
+# Drop the residual column from the current export before the rename below
+# recreates it, otherwise the dataset ends up with two columns of the same
+# name; the residual (11 districts) is a subset of the corrected column (67)
+df_final = df_final.drop(
+    columns=["code_parent_communication_and_involvement_applied"], errors="ignore"
+)
+
 # Merge correct parent codes back into final dataset
 df_final = df_final.merge(correct_parent_codes[KEEP_COLUMNS], on="leaid", how="left")
 df_final = df_final.rename(
@@ -183,29 +190,66 @@ columns_to_drop = [
 
 
 df_final = df_final.drop(columns=columns_to_drop, errors="ignore")
-# %%
-# Add code titles for reference
-# Add human-readable titles for each code column to aid interpretation
-print("Adding code titles for reference...")
-code_columns = [col for col in df_final.columns if "code_" in col]
+# %% Validate code columns against the crosswalk
+# Every applied code column must have a crosswalk row and vice versa; failing
+# loudly here catches renames/additions in Dedoose the day they appear
+code_columns = [col for col in df_final.columns if "code_" in col and "applied" in col]
 
+duplicated_columns = df_final.columns[df_final.columns.duplicated()].tolist()
+assert not duplicated_columns, f"Duplicate columns in final dataset: {duplicated_columns}"
+
+columns_missing_from_crosswalk = sorted(set(code_columns) - set(crosswalk_df.code_column))
+crosswalk_rows_missing_from_data = sorted(set(crosswalk_df.code_column) - set(code_columns))
+assert not columns_missing_from_crosswalk, (
+    f"Code columns with no crosswalk row (new or renamed code in Dedoose? "
+    f"add to {start.CROSSWALK_FILE}): {columns_missing_from_crosswalk}"
+)
+assert not crosswalk_rows_missing_from_data, (
+    f"Crosswalk rows with no matching code column (code removed or renamed "
+    f"in Dedoose?): {crosswalk_rows_missing_from_data}"
+)
+print(f"Crosswalk validation passed: {len(code_columns)} code columns all matched")
+
+# %% Add code titles for reference
+# Titles come from the crosswalk so they survive renames in Dedoose
+crosswalk_titles = crosswalk_df.set_index("code_column")["dedoose_title"]
 for code_col in code_columns:
-    # Extract the clean code name (remove 'code_' prefix and '_applied' suffix)
-    code_name = code_col.replace("code_", "").replace("_applied", "")
-    
-    # Find matching code in codebook
-    match = codebook_df[codebook_df["code"] == code_name]
-    
-    if not match.empty:
-        title = match["Title"].values[0]
-        df_final[code_col + "_title"] = title
-    else:
-        print(f"Warning: No title found for code: {code_name}")
-        df_final[code_col + "_title"] = ""
-
+    df_final[code_col + "_title"] = crosswalk_titles[code_col]
 print(f"Added titles for {len(code_columns)} code columns")
 
-# Save final dataset
+# %% Create top-level code columns
+# A district gets a top-level code if any of its member goal codes applied
+goal_crosswalk = crosswalk_df[crosswalk_df.code_type == "goal"]
+
+for top_level_code in goal_crosswalk.top_level_code.unique():
+    member_columns = goal_crosswalk[
+        goal_crosswalk.top_level_code == top_level_code
+    ].code_column.tolist()
+
+    clean_top_level = re.sub(regex_pattern + r"|\+", "_", top_level_code)
+    clean_top_level = re.sub("_+", "_", clean_top_level).strip("_").lower()
+    top_level_column = "top_" + clean_top_level + "_applied"
+
+    df_final[top_level_column] = df_final[member_columns].max(axis=1)
+    print(
+        f"{top_level_column}: {int(df_final[top_level_column].sum())} districts "
+        f"({len(member_columns)} member codes)"
+    )
+
+# %% Sanity-check counts against the previous version of the dataset
+previous_path = start.MAIN_DIR + "data/clean/plans_codes.csv"
+try:
+    previous_df = pd.read_csv(previous_path)
+    for code_col in code_columns:
+        if code_col in previous_df.columns:
+            previous_count = pd.to_numeric(previous_df[code_col], errors="coerce").fillna(0).sum()
+            new_count = df_final[code_col].sum()
+            if previous_count != new_count:
+                print(f"Count changed for {code_col}: {int(previous_count)} -> {int(new_count)}")
+except FileNotFoundError:
+    print("No previous plans_codes.csv to compare against")
+
+# %% Save final dataset
 output_path = start.MAIN_DIR + "data/clean/plans_codes.csv"
 df_final.to_csv(output_path, index=False)
 print(f"Final dataset saved to: {output_path}")
