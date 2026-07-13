@@ -159,6 +159,39 @@ button.danger { background: #e53935; color: #fff; border: none; border-radius: 4
   font-size: 12px; letter-spacing: 0.4px;
 }
 .code-row.drop-target { outline: 2px dashed #5e4b8b; background: #f3effa; }
+#codebook-stats {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-bottom: 1px solid #eee; font-size: 12px; color: #555;
+}
+#codebook-counts { flex: 1; font-weight: 600; }
+#codebook-stats button {
+  border: 1px solid #ccc; background: #fff; border-radius: 4px;
+  padding: 2px 8px; font-size: 11px; cursor: pointer; color: #555;
+}
+#codebook-stats button:hover { background: #f0f4f8; }
+
+#code-display-line { font-size: 12px; color: #6b5d3f; margin-bottom: 6px; }
+#code-display-input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 13px;
+  padding: 4px 8px; border: 1px solid #d5c89f; border-radius: 4px; margin-top: 2px;
+}
+#code-def-editor { margin-top: 6px; }
+#code-def-textarea {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 13px;
+  padding: 6px 8px; border: 1px solid #d5c89f; border-radius: 4px; resize: vertical;
+}
+#code-def-editor div { margin-top: 6px; display: flex; gap: 6px; }
+#btn-save-definition {
+  background: #2c3e50; color: #fff; border: none; border-radius: 4px;
+  padding: 4px 12px; cursor: pointer;
+}
+#btn-cancel-definition { padding: 4px 12px; cursor: pointer; }
+#btn-edit-definition {
+  flex-shrink: 0; border: 1px solid #d5c89f; background: #fff; border-radius: 4px;
+  padding: 2px 10px; font-size: 12px; cursor: pointer; color: #6b5d3f;
+}
+#btn-edit-definition:hover { background: #f3ecd9; }
+
 #root-drop-zone {
   margin: 6px 8px 2px; padding: 4px 8px; border: 1.5px dashed #bbb;
   border-radius: 4px; color: #999; font-size: 11px; text-align: center;
@@ -242,6 +275,97 @@ button.danger { background: #e53935; color: #fff; border: none; border-radius: 4
 #anchor-search { flex: 1; min-width: 160px; padding: 4px 8px; }
 #anchor-bar button { padding: 4px 10px; cursor: pointer; }
 #anchor-save:not(:disabled) { background: #4caf50; color: #fff; border: none; border-radius: 4px; }
+
+/* ---------- export tab ---------- */
+#export-layout {
+  display: grid; grid-template-columns: 420px 1fr;
+  height: calc(100% - 40px);
+}
+#export-actions { padding: 16px; border-right: 1px solid #ddd; overflow-y: auto; }
+.export-card {
+  border: 1px solid #ddd; border-radius: 6px; padding: 12px 16px; margin-bottom: 14px;
+  background: #fafafa;
+}
+.export-card h3 { margin: 0 0 6px; font-size: 14px; }
+.export-card p { margin: 0 0 10px; font-size: 12px; color: #555; }
+.export-card code { background: #eee; padding: 0 3px; border-radius: 2px; }
+.export-card button {
+  background: #2c3e50; color: #fff; border: none; border-radius: 4px;
+  padding: 6px 14px; cursor: pointer;
+}
+.export-card button:hover { background: #3d566e; }
+.export-card button:disabled { opacity: 0.5; }
+#export-output {
+  background: #1e1e1e; color: #c8e6c9; font-size: 11px; padding: 10px;
+  border-radius: 4px; white-space: pre-wrap; max-height: 40vh; overflow-y: auto;
+}
+#export-files { overflow-y: auto; }
+#export-dir-note { font-weight: 400; font-size: 11px; color: #999; margin-left: 8px; }
+#export-file-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#export-file-table th, #export-file-table td {
+  text-align: left; padding: 5px 12px; border-bottom: 1px solid #f0f0f0;
+}
+#export-file-table th { background: #f5f5f5; }
+
+/* ---------- review tab ---------- */
+#review-layout {
+  display: grid; grid-template-columns: 380px 1fr;
+  height: calc(100% - 40px);
+}
+#review-controls { border-right: 1px solid #ddd; overflow-y: auto; padding: 12px; }
+.review-field { display: block; margin-bottom: 8px; font-size: 13px; }
+.review-field select { width: 100%; margin-top: 3px; padding: 4px; }
+#review-code-checks {
+  max-height: 30vh; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;
+  padding: 4px 8px; margin-top: 4px; background: #fff;
+}
+.review-code-check { display: block; font-size: 12px; padding: 1px 0; cursor: pointer; }
+#review-estimate { font-size: 12px; color: #555; font-weight: 600; }
+.review-note { font-size: 11px; color: #888; margin-top: 8px; }
+#review-prompt-details { margin: 8px 0; font-size: 12px; }
+#review-prompt-details summary { cursor: pointer; color: #2c3e50; font-weight: 600; }
+#review-prompt-model { margin: 6px 0 4px; color: #555; font-size: 11px; }
+#review-prompt-text {
+  background: #f6f6f2; border: 1px solid #e0ddd0; border-radius: 4px;
+  padding: 8px 10px; font-size: 11px; line-height: 1.5;
+  white-space: pre-wrap; max-height: 40vh; overflow-y: auto; margin: 0 0 4px;
+}
+#btn-review-run {
+  background: #2c3e50; color: #fff; border: none; border-radius: 4px;
+  padding: 6px 14px; cursor: pointer;
+}
+#btn-review-run:disabled { opacity: 0.5; }
+#review-job-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; }
+.review-job { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; }
+.review-job.running, .review-job.pending { color: #b26a00; }
+.review-job.error { color: #c62828; }
+.review-job.done { color: #2e7d32; }
+.review-cancel {
+  font-size: 10px; padding: 1px 8px; margin-left: 6px; cursor: pointer;
+  border: 1px solid #c62828; background: #fff; color: #c62828; border-radius: 3px;
+}
+#review-findings-panel { overflow-y: auto; }
+.finding-card {
+  border-bottom: 1px solid #e8e8e8; padding: 10px 16px;
+}
+.finding-heading { font-size: 13px; margin-bottom: 4px; }
+.finding-card blockquote {
+  margin: 6px 0; padding: 6px 10px; border-left: 3px solid #f4b942;
+  background: #fffdf5; font-size: 13px; color: #333;
+}
+.finding-rationale { font-size: 12px; color: #777; margin-bottom: 6px; }
+.finding-buttons { display: flex; gap: 6px; }
+.finding-buttons button {
+  padding: 3px 10px; font-size: 12px; cursor: pointer;
+  border: 1px solid #ccc; border-radius: 4px; background: #fff;
+}
+.finding-buttons button.accept { background: #2e7d32; color: #fff; border: none; }
+.finding-buttons button.reject { background: #fff; }
+.finding-buttons button.danger { background: #c62828; color: #fff; border: none; }
+.confidence { font-size: 10px; border-radius: 8px; padding: 1px 7px; text-transform: uppercase; }
+.confidence.high { background: #c8e6c9; color: #1b5e20; }
+.confidence.medium { background: #fff3cd; color: #7a5c00; }
+.confidence.low { background: #eeeeee; color: #666; }
 
 /* ---------- unanchored view ---------- */
 #unanchored-view {

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS codes (
     id INTEGER PRIMARY KEY,              -- Dedoose Ids preserved on import
     parent_id INTEGER REFERENCES codes(id),
     title TEXT NOT NULL,
+    display_name TEXT,                   -- table-ready name for analysis output
     description TEXT NOT NULL DEFAULT '',
     weighted INTEGER NOT NULL DEFAULT 1,
     weight_min REAL NOT NULL DEFAULT 0,
@@ -64,6 +65,42 @@ CREATE TABLE IF NOT EXISTS excerpt_rects (
     rect_order INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_rects_excerpt ON excerpt_rects(excerpt_id);
+
+-- LLM-assisted review: jobs submit Message Batches; findings await human
+-- accept/reject in the Review tab. Nothing changes coding data until accepted.
+CREATE TABLE IF NOT EXISTS review_jobs (
+    id INTEGER PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('missing', 'audit')),
+    code_id INTEGER,                     -- legacy (batch-era single-code jobs)
+    code_ids TEXT,                       -- JSON list of code ids for this run
+    completed_count INTEGER NOT NULL DEFAULT 0,
+    pid INTEGER,                         -- runner process id (for cancel)
+    model TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'running', 'done', 'error')),
+    batch_id TEXT,
+    request_count INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    completed_at TEXT,
+    error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS review_findings (
+    id INTEGER PRIMARY KEY,
+    job_id INTEGER NOT NULL REFERENCES review_jobs(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('missing', 'audit')),
+    code_id INTEGER NOT NULL,
+    document_id INTEGER NOT NULL,
+    excerpt_id INTEGER,                  -- audit: the excerpt reviewed
+    proposed_text TEXT,                  -- missing: verbatim quote from the plan
+    page_hint INTEGER,
+    verdict TEXT,
+    rationale TEXT,
+    confidence TEXT,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'accepted', 'rejected'))
+);
+CREATE INDEX IF NOT EXISTS idx_findings_status ON review_findings(status);
 
 CREATE TABLE IF NOT EXISTS excerpt_codes (
     excerpt_id INTEGER NOT NULL REFERENCES excerpts(id) ON DELETE CASCADE,

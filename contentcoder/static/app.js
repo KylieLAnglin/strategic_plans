@@ -678,7 +678,7 @@ function buildCodeTree(treeRoot, mode) {
         addChild.onclick = (event) => { event.stopPropagation(); createCode(code.id); };
         const edit = document.createElement("button");
         edit.textContent = "✎";
-        edit.title = "Edit code";
+        edit.title = "Rename code (edit its definition in the right panel)";
         edit.onclick = (event) => { event.stopPropagation(); editCode(code); };
         const remove = document.createElement("button");
         remove.textContent = "🗑";
@@ -729,6 +729,9 @@ function buildCodeTree(treeRoot, mode) {
 function renderCodeTrees() {
   buildCodeTree($("manage-code-tree"), "manage");
   if (editor) buildCodeTree($("editor-code-tree"), "pick");
+  const categoryCount = codes.filter((c) => c.is_category).length;
+  const codeCount = codes.length - categoryCount;
+  $("codebook-counts").textContent = `${categoryCount} top-level categories · ${codeCount} codes`;
 }
 
 // ------------------------------------------------------------------ codebook tab
@@ -738,7 +741,11 @@ async function selectCodebookCode(codeId) {
   renderCodeTrees();
   const code = codes.find((c) => c.id === codeId);
   $("code-definition").classList.remove("hidden");
+  $("code-display-name").textContent = code.display_name || `${code.title} (same as code title)`;
   $("code-def-text").textContent = code.description || "(no definition written)";
+  $("code-def-editor").classList.add("hidden");
+  $("code-def-row").classList.remove("hidden");
+  $("code-display-line").classList.toggle("hidden", Boolean(code.is_category));
   $("code-history-list").classList.add("hidden");
   $("btn-code-history").textContent = "History ▾";
   const rows = await api(`/api/codes/${codeId}/excerpts`);
@@ -832,9 +839,238 @@ function switchTab(tabName) {
   });
   $("layout").classList.toggle("hidden", tabName !== "documents");
   $("codebook-layout").classList.toggle("hidden", tabName !== "codebook");
+  $("export-layout").classList.toggle("hidden", tabName !== "export");
+  $("review-layout").classList.toggle("hidden", tabName !== "review");
   // Viewer controls only make sense on the Documents tab
   for (const id of ["btn-zoom-in", "btn-zoom-out", "zoom-level", "current-doc-title"]) {
     $(id).classList.toggle("hidden", tabName !== "documents");
+  }
+  if (tabName === "export") refreshExportFiles();
+  if (tabName === "review") refreshReviewTab();
+}
+
+// ------------------------------------------------------------------ review tab
+
+let reviewPollTimer = null;
+
+const REVIEW_MAX_CODES = 3;
+
+function selectedReviewCodeIds() {
+  return Array.from(
+    document.querySelectorAll("#review-code-checks input:checked")
+  ).map((box) => Number(box.value));
+}
+
+async function refreshReviewTab() {
+  // Populate the code checkbox list (non-category codes), keeping selections
+  const container = $("review-code-checks");
+  const previouslyChecked = new Set(selectedReviewCodeIds());
+  container.innerHTML = "";
+  for (const code of codes.filter((c) => !c.is_category)) {
+    const label = document.createElement("label");
+    label.className = "review-code-check";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.value = code.id;
+    box.checked = previouslyChecked.has(code.id);
+    box.addEventListener("change", () => {
+      // Cap the selection at REVIEW_MAX_CODES
+      if (selectedReviewCodeIds().length > REVIEW_MAX_CODES) {
+        box.checked = false;
+        return;
+      }
+      refreshReviewEstimate();
+    });
+    label.append(box, document.createTextNode(" " + code.title));
+    container.append(label);
+  }
+  await Promise.all([refreshReviewEstimate(), refreshReviewJobs(), refreshReviewFindings()]);
+}
+
+async function refreshReviewEstimate() {
+  const kind = $("review-kind").value;
+  const codeIds = selectedReviewCodeIds();
+  const query = `kind=${kind}&code_ids=${codeIds.join(",")}`;
+  const [estimate, prompt] = await Promise.all([
+    api(`/api/review/estimate?${query}`),
+    api(`/api/review/prompt?${query}`),
+  ]);
+  $("review-estimate").textContent = codeIds.length
+    ? `${estimate.requests} request(s) · est. ~$${estimate.est_dollars.toFixed(2)} · results stream in live`
+    : "Select 1–3 codes";
+  $("review-prompt-model").textContent = `Model: ${prompt.model} (system prompt below)`;
+  $("review-prompt-text").textContent = prompt.system_prompt;
+  $("review-prompt-note").textContent = prompt.per_request;
+}
+
+async function refreshReviewJobs() {
+  const jobs = await api("/api/review/jobs");
+  const list = $("review-job-list");
+  list.innerHTML = "";
+  let anyRunning = false;
+  for (const job of jobs) {
+    if (job.status === "running" || job.status === "pending") anyRunning = true;
+    const item = document.createElement("li");
+    const findings = job.pending_findings ? ` · ${job.pending_findings} pending` : "";
+    const progress =
+      job.status === "running" && job.request_count
+        ? ` (${job.completed_count}/${job.request_count})`
+        : job.request_count ? ` (${job.request_count} req)` : "";
+    item.textContent =
+      `#${job.id} ${job.kind} — ${job.code_titles} — ${job.status}` +
+      progress + findings + (job.error ? ` — ${job.error}` : "");
+    item.className = `review-job ${job.status}`;
+    if (job.status === "running" || job.status === "pending") {
+      const cancelButton = document.createElement("button");
+      cancelButton.textContent = "Cancel";
+      cancelButton.className = "review-cancel";
+      cancelButton.onclick = async () => {
+        await api(`/api/review/jobs/${job.id}/cancel`, { method: "POST", body: {} });
+        refreshReviewJobs();
+      };
+      item.append(" ", cancelButton);
+    }
+    list.append(item);
+  }
+  clearTimeout(reviewPollTimer);
+  if (anyRunning && activeTab === "review") {
+    reviewPollTimer = setTimeout(() => {
+      refreshReviewJobs();
+      refreshReviewFindings();
+    }, 10000);
+  }
+}
+
+async function refreshReviewFindings() {
+  const findings = await api("/api/review/findings");
+  $("review-findings-count").textContent = findings.length ? `(${findings.length})` : "";
+  const container = $("review-findings");
+  container.innerHTML = "";
+  if (!findings.length) {
+    container.innerHTML = '<p class="review-note" style="padding:12px">No pending findings.</p>';
+    return;
+  }
+  for (const finding of findings) {
+    const card = document.createElement("div");
+    card.className = "finding-card";
+
+    const heading = document.createElement("div");
+    heading.className = "finding-heading";
+    heading.innerHTML =
+      `<b>${finding.code_title}</b> — ${finding.media_title}` +
+      (finding.page_hint ? ` (p.${finding.page_hint})` : "") +
+      ` <span class="confidence ${finding.confidence}">${finding.confidence || ""}</span>`;
+    card.append(heading);
+
+    const quote = document.createElement("blockquote");
+    quote.textContent =
+      finding.kind === "missing" ? finding.proposed_text : finding.current_excerpt_text;
+    card.append(quote);
+
+    if (finding.kind === "audit" && finding.excerpt_code_titles) {
+      const codesLine = document.createElement("div");
+      codesLine.className = "finding-rationale";
+      codesLine.textContent = `Currently coded: ${finding.excerpt_code_titles}`;
+      card.append(codesLine);
+    }
+
+    const rationale = document.createElement("div");
+    rationale.className = "finding-rationale";
+    rationale.textContent = finding.rationale || "";
+    card.append(rationale);
+
+    const buttons = document.createElement("div");
+    buttons.className = "finding-buttons";
+    if (finding.kind === "missing") {
+      buttons.append(
+        findingButton("Open in document", () => openFindingInDocument(finding)),
+        findingButton("Accept — apply code", () => resolveFinding(finding.id, "accept", {}), "accept"),
+        findingButton("Reject", () => resolveFinding(finding.id, "reject"), "reject"),
+      );
+    } else {
+      buttons.append(
+        findingButton("Remove code", () => resolveFinding(finding.id, "accept", { action: "remove_code" }), "accept"),
+        findingButton("Delete excerpt", () => resolveFinding(finding.id, "accept", { action: "delete_excerpt" }), "danger"),
+        findingButton("Keep as coded", () => resolveFinding(finding.id, "reject"), "reject"),
+      );
+    }
+    card.append(buttons);
+    container.append(card);
+  }
+}
+
+function findingButton(label, onClick, styleClass) {
+  const button = document.createElement("button");
+  button.textContent = label;
+  if (styleClass) button.classList.add(styleClass);
+  button.onclick = async () => {
+    button.disabled = true;
+    await onClick();
+  };
+  return button;
+}
+
+async function resolveFinding(findingId, action, body) {
+  try {
+    await api(`/api/review/findings/${findingId}/${action}`, {
+      method: "POST",
+      body: body || {},
+    });
+  } catch (error) {
+    alert(error.message);
+  }
+  await Promise.all([refreshReviewFindings(), refreshDocuments(), refreshCodes()]);
+}
+
+async function openFindingInDocument(finding) {
+  const doc = documents.find((d) => d.id === finding.document_id);
+  if (!doc) return;
+  switchTab("documents");
+  if (!currentDoc || currentDoc.id !== doc.id) await openDocument(doc);
+  // Reuse the anchor-search machinery to flash the quote's location
+  $("anchor-bar").classList.remove("hidden");
+  $("anchor-excerpt-text").textContent = `“${(finding.proposed_text || "").slice(0, 200)}”`;
+  $("anchor-original-range").textContent = finding.page_hint ? `p.${finding.page_hint}` : "";
+  $("anchor-save").disabled = true;
+  const searchBox = $("anchor-search");
+  searchBox.value = (finding.proposed_text || "").split(/\s+/).slice(0, 6).join(" ");
+  runAnchorSearch();
+}
+
+// ------------------------------------------------------------------ export tab
+
+async function refreshExportFiles() {
+  const listing = await api("/api/exports");
+  $("export-dir-note").textContent = listing.export_dir;
+  const tbody = document.querySelector("#export-file-table tbody");
+  tbody.innerHTML = "";
+  for (const file of listing.files) {
+    const tr = document.createElement("tr");
+    const sizeText =
+      file.size > 1e6 ? `${(file.size / 1e6).toFixed(1)} MB` : `${Math.round(file.size / 1e3)} KB`;
+    const dateText = new Date(file.modified * 1000).toLocaleString();
+    for (const text of [file.name, dateText, sizeText]) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+}
+
+async function runExport(kind, button) {
+  button.disabled = true;
+  const output = $("export-output");
+  output.classList.remove("hidden");
+  output.textContent = "Exporting…";
+  try {
+    const result = await api("/api/export", { method: "POST", body: { kind } });
+    output.textContent = result.output;
+  } catch (error) {
+    output.textContent = `Export failed: ${error.message}`;
+  } finally {
+    button.disabled = false;
+    refreshExportFiles();
   }
 }
 
@@ -879,11 +1115,10 @@ async function moveCode(codeId, newParentId) {
 }
 
 async function editCode(code) {
+  // Renames only — definitions are edited in the right-hand panel
   const title = prompt("Code title:", code.title);
-  if (title === null) return;
-  const description = prompt("Description:", code.description || "");
-  if (description === null) return;
-  await api(`/api/codes/${code.id}`, { method: "PATCH", body: { title, description } });
+  if (title === null || !title.trim() || title === code.title) return;
+  await api(`/api/codes/${code.id}`, { method: "PATCH", body: { title: title.trim() } });
   refreshCodes();
 }
 
@@ -1075,6 +1310,43 @@ $("btn-add-root-code").onclick = () => createCode(null);
 $("btn-add-root-category").onclick = () => createCode(null, true);
 $("btn-code-history").onclick = toggleCodeHistory;
 
+$("btn-expand-all").onclick = () => {
+  expandedCodes = new Set(codes.map((c) => c.id));
+  renderCodeTrees();
+};
+$("btn-collapse-all").onclick = () => {
+  expandedCodes = new Set();
+  renderCodeTrees();
+};
+
+$("btn-edit-definition").onclick = () => {
+  if (!selectedCodeId) return;
+  const code = codes.find((c) => c.id === selectedCodeId);
+  $("code-display-input").value = code.display_name || "";
+  $("code-display-input").placeholder = code.title;
+  $("code-def-textarea").value = code.description || "";
+  $("code-def-row").classList.add("hidden");
+  $("code-display-line").classList.add("hidden");
+  $("code-history-list").classList.add("hidden");
+  $("code-def-editor").classList.remove("hidden");
+  $("code-def-textarea").focus();
+};
+$("btn-cancel-definition").onclick = () => {
+  $("code-def-editor").classList.add("hidden");
+  $("code-def-row").classList.remove("hidden");
+};
+$("btn-save-definition").onclick = async () => {
+  if (!selectedCodeId) return;
+  await api(`/api/codes/${selectedCodeId}`, {
+    method: "PATCH",
+    body: {
+      display_name: $("code-display-input").value.trim() || null,
+      description: $("code-def-textarea").value.trim(),
+    },
+  });
+  await refreshCodes();  // re-renders the definition panel via selectCodebookCode
+};
+
 const rootDropZone = $("root-drop-zone");
 rootDropZone.ondragover = (event) => {
   event.preventDefault();
@@ -1093,15 +1365,29 @@ $("btn-scan").onclick = async () => {
   alert(`Scan complete: ${result.added} new file(s) of ${result.total_on_disk} on disk.`);
   refreshDocuments();
 };
-$("btn-export").onclick = async () => {
-  $("btn-export").disabled = true;
+$("btn-export-native").onclick = () => runExport("native", $("btn-export-native"));
+$("btn-export-dedoose").onclick = () => runExport("dedoose", $("btn-export-dedoose"));
+
+$("review-kind").addEventListener("change", refreshReviewEstimate);
+$("btn-review-run").onclick = async () => {
+  const kind = $("review-kind").value;
+  const codeIds = selectedReviewCodeIds();
+  if (!codeIds.length) {
+    alert("Select 1-3 codes first.");
+    return;
+  }
+  const scope = codeIds
+    .map((id) => codes.find((c) => c.id === id).title)
+    .join(", ");
+  if (!confirm(`Run the "${kind}" review for: ${scope}?\n${$("review-estimate").textContent}`)) return;
+  $("btn-review-run").disabled = true;
   try {
-    const result = await api("/api/export", { method: "POST" });
-    alert(result.output || "Export complete.");
+    await api("/api/review/run", { method: "POST", body: { kind, code_ids: codeIds } });
   } catch (error) {
-    alert(`Export failed: ${error.message}`);
+    alert(error.message);
   } finally {
-    $("btn-export").disabled = false;
+    $("btn-review-run").disabled = false;
+    refreshReviewJobs();
   }
 };
 

@@ -23,6 +23,7 @@ SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.s
 
 CODE_SNAPSHOT_FIELDS = [
     "title",
+    "display_name",
     "description",
     "parent_id",
     "weighted",
@@ -58,6 +59,10 @@ def init_db():
     for migration in (
         "ALTER TABLE documents ADD COLUMN in_sample INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE codes ADD COLUMN is_category INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE review_jobs ADD COLUMN code_ids TEXT",
+        "ALTER TABLE review_jobs ADD COLUMN completed_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE review_jobs ADD COLUMN pid INTEGER",
+        "ALTER TABLE codes ADD COLUMN display_name TEXT",
     ):
         try:
             connection.execute(migration)
@@ -424,7 +429,7 @@ def update_code(code_id):
                 "SELECT parent_id FROM codes WHERE id = ?", (ancestor_id,)
             ).fetchone()
             ancestor_id = row["parent_id"] if row else None
-    for field in ["title", "description", "parent_id"]:
+    for field in ["title", "display_name", "description", "parent_id"]:
         if field in payload:
             db.execute(
                 f"UPDATE codes SET {field} = ? WHERE id = ?", (payload[field], code_id)
@@ -505,15 +510,290 @@ def code_history_log():
 
 # ---------------------------------------------------------------- export
 
+# ---------------------------------------------------------------- LLM review
+
+@app.post("/api/review/run")
+def review_run():
+    payload = request.get_json()
+    db = get_db()
+    running = db.execute(
+        "SELECT id FROM review_jobs WHERE status IN ('pending','running')"
+    ).fetchone()
+    if running:
+        return jsonify({"error": f"job {running['id']} is still running"}), 409
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return (
+            jsonify({"error": "ANTHROPIC_API_KEY is not set in the server's environment. "
+                              "Set it and restart the server (see README)."}),
+            400,
+        )
+    code_ids = payload.get("code_ids") or []
+    if not 1 <= len(code_ids) <= config.REVIEW_MAX_CODES_PER_RUN:
+        return jsonify({"error": f"select 1-{config.REVIEW_MAX_CODES_PER_RUN} codes"}), 400
+    cursor = db.execute(
+        "INSERT INTO review_jobs (kind, code_ids, model) VALUES (?,?,?)",
+        (payload["kind"], json.dumps(code_ids), payload.get("model", config.REVIEW_MODEL)),
+    )
+    db.commit()
+    job_id = cursor.lastrowid
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "review_llm.py")
+    log_path = os.path.join(config.DATA_DIR, f"review_job_{job_id}.log")
+    with open(log_path, "a") as log_file:
+        process = subprocess.Popen(
+            [sys.executable, script_path, "--job-id", str(job_id)],
+            stdout=log_file, stderr=log_file, start_new_session=True,
+        )
+    db.execute("UPDATE review_jobs SET pid = ? WHERE id = ?", (process.pid, job_id))
+    db.commit()
+    return jsonify({"job_id": job_id})
+
+
+@app.post("/api/review/jobs/<int:job_id>/cancel")
+def review_cancel(job_id):
+    import signal
+
+    db = get_db()
+    job = db.execute("SELECT * FROM review_jobs WHERE id = ?", (job_id,)).fetchone()
+    if job is None or job["status"] not in ("pending", "running"):
+        return jsonify({"error": "job is not running"}), 409
+    if job["pid"]:
+        try:
+            os.kill(job["pid"], signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    db.execute(
+        "UPDATE review_jobs SET status='error', error='cancelled by user', "
+        "completed_at=datetime('now','localtime') WHERE id=?",
+        (job_id,),
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/review/jobs")
+def review_jobs():
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT j.*,
+               (SELECT COUNT(*) FROM review_findings f
+                WHERE f.job_id = j.id AND f.status = 'pending') AS pending_findings
+        FROM review_jobs j ORDER BY j.id DESC LIMIT 30
+        """
+    ).fetchall()
+    jobs = []
+    for row in rows:
+        job = dict(row)
+        ids = json.loads(job["code_ids"]) if job["code_ids"] else (
+            [job["code_id"]] if job["code_id"] else []
+        )
+        titles = [
+            title for (title,) in db.execute(
+                f"SELECT title FROM codes WHERE id IN ({','.join('?' * len(ids))})", ids
+            )
+        ] if ids else []
+        job["code_titles"] = ", ".join(titles) if titles else "all codes"
+        jobs.append(job)
+    return jsonify(jobs)
+
+
+@app.get("/api/review/estimate")
+def review_estimate():
+    kind = request.args.get("kind")
+    code_ids = [int(x) for x in request.args.get("code_ids", "").split(",") if x]
+    db = get_db()
+    if not code_ids:
+        return jsonify({"requests": 0, "est_tokens": 0, "est_dollars": 0})
+    placeholders = ",".join("?" * len(code_ids))
+    if kind == "missing":
+        # documents missing at least one selected code (each read once)
+        request_count = db.execute(
+            f"""SELECT COUNT(*) AS n FROM documents d
+                WHERE d.in_sample = 1 AND d.pdf_filename IS NOT NULL
+                AND (SELECT COUNT(DISTINCT ec.code_id) FROM excerpt_codes ec
+                     JOIN excerpts e ON e.id = ec.excerpt_id
+                     WHERE e.document_id = d.id AND ec.code_id IN ({placeholders}))
+                    < ?""",
+            (*code_ids, len(code_ids)),
+        ).fetchone()["n"]
+        tokens_per_request, output_per_request = 6000, 300
+    else:
+        request_count = db.execute(
+            f"""SELECT COUNT(*) AS n FROM excerpts e
+                JOIN excerpt_codes ec ON ec.excerpt_id = e.id
+                    AND ec.code_id IN ({placeholders})
+                JOIN documents d ON d.id = e.document_id
+                WHERE d.in_sample = 1 AND e.excerpt_text IS NOT NULL""",
+            code_ids,
+        ).fetchone()["n"]
+        tokens_per_request, output_per_request = 500, 150
+
+    tokens = request_count * tokens_per_request
+    dollars = (
+        tokens / 1e6 * config.REVIEW_PRICE_PER_MTOK_INPUT
+        + request_count * output_per_request / 1e6 * config.REVIEW_PRICE_PER_MTOK_OUTPUT
+    )
+    return jsonify(
+        {"requests": request_count, "est_tokens": tokens, "est_dollars": round(dollars, 2)}
+    )
+
+
+@app.get("/api/review/prompt")
+def review_prompt():
+    """The exact system prompt a run would use, for display in the tab."""
+    import review_llm
+
+    kind = request.args.get("kind", "missing")
+    code_ids = [int(x) for x in request.args.get("code_ids", "").split(",") if x]
+    db = get_db()
+    code_rows = db.execute(
+        f"SELECT * FROM codes WHERE id IN ({','.join('?' * len(code_ids))})", code_ids
+    ).fetchall() if code_ids else []
+
+    if kind == "missing":
+        blocks = review_llm.missing_code_blocks(code_rows) if code_rows else (
+            "1. Title: {selected code}\n   Definition: {its definition}"
+        )
+        prompt = review_llm.MISSING_SYSTEM_TEMPLATE.format(code_blocks=blocks)
+        per_request = ("Each plan missing at least one selected code is read once; "
+                       "its full text (with [[page N]] markers) is the user message. "
+                       "Codes a plan already has are left out of that plan's request.")
+    else:
+        first = code_rows[0] if code_rows else None
+        prompt = review_llm.AUDIT_SYSTEM_TEMPLATE.format(
+            title=first["title"] if first else "{selected code}",
+            definition=(first["description"] or "(no definition)") if first else "{its definition}",
+        )
+        per_request = "The district name and excerpt text are sent as the user message."
+        if len(code_rows) > 1:
+            per_request += (" With multiple codes selected, each excerpt is judged "
+                            "against its own code's version of this prompt.")
+    return jsonify({"system_prompt": prompt, "per_request": per_request,
+                    "model": config.REVIEW_MODEL})
+
+
+@app.get("/api/review/findings")
+def review_findings():
+    rows = get_db().execute(
+        """
+        SELECT f.*, c.title AS code_title, d.media_title,
+               e.excerpt_text AS current_excerpt_text,
+               (SELECT GROUP_CONCAT(c2.title, ', ') FROM excerpt_codes ec2
+                JOIN codes c2 ON c2.id = ec2.code_id
+                WHERE ec2.excerpt_id = f.excerpt_id) AS excerpt_code_titles
+        FROM review_findings f
+        JOIN codes c ON c.id = f.code_id
+        JOIN documents d ON d.id = f.document_id
+        LEFT JOIN excerpts e ON e.id = f.excerpt_id
+        WHERE f.status = 'pending'
+        ORDER BY c.title COLLATE NOCASE, d.media_title COLLATE NOCASE, f.id
+        """
+    ).fetchall()
+    return jsonify([dict(row) for row in rows])
+
+
+@app.post("/api/review/findings/<int:finding_id>/reject")
+def review_reject(finding_id):
+    db = get_db()
+    db.execute("UPDATE review_findings SET status='rejected' WHERE id=?", (finding_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/review/findings/<int:finding_id>/accept")
+def review_accept(finding_id):
+    import fitz
+    from anchoring import anchor_excerpt
+
+    payload = request.get_json(silent=True) or {}
+    db = get_db()
+    finding = db.execute(
+        "SELECT * FROM review_findings WHERE id = ?", (finding_id,)
+    ).fetchone()
+    if finding is None:
+        return jsonify({"error": "finding not found"}), 404
+
+    if finding["kind"] == "audit":
+        action = payload.get("action", "remove_code")
+        if action == "delete_excerpt":
+            db.execute("DELETE FROM excerpts WHERE id = ?", (finding["excerpt_id"],))
+        else:
+            db.execute(
+                "DELETE FROM excerpt_codes WHERE excerpt_id = ? AND code_id = ?",
+                (finding["excerpt_id"], finding["code_id"]),
+            )
+        db.execute("UPDATE review_findings SET status='accepted' WHERE id=?", (finding_id,))
+        db.commit()
+        return jsonify({"ok": True})
+
+    # missing: anchor the proposed quote and create a coded excerpt
+    document = db.execute(
+        "SELECT * FROM documents WHERE id = ?", (finding["document_id"],)
+    ).fetchone()
+    anchor_result = None
+    if document["pdf_filename"]:
+        fitz_document = fitz.open(os.path.join(config.PDF_DIR, document["pdf_filename"]))
+        anchor_result = anchor_excerpt(
+            fitz_document, {}, finding["proposed_text"], finding["page_hint"]
+        )
+        fitz_document.close()
+    matched = bool(anchor_result and anchor_result.get("matched"))
+    cursor = db.execute(
+        """INSERT INTO excerpts (document_id, page_number, char_start, char_end,
+           excerpt_text, excerpt_creator, created_date, anchor_status, match_quality, source)
+           VALUES (?,?,?,?,?,?,?,?,?, 'app')""",
+        (
+            finding["document_id"],
+            anchor_result["page_number"] if matched else finding["page_hint"],
+            anchor_result["char_start"] if matched else None,
+            anchor_result["char_end"] if matched else None,
+            finding["proposed_text"],
+            config.REVIEW_EXCERPT_CREATOR,
+            date.today().isoformat(),
+            "anchored" if matched else "unanchored",
+            anchor_result["score"] if anchor_result else None,
+        ),
+    )
+    excerpt_id = cursor.lastrowid
+    if matched:
+        replace_excerpt_rects(db, excerpt_id, anchor_result["rects"])
+    replace_excerpt_codes(db, excerpt_id, [finding["code_id"]])
+    db.execute("UPDATE review_findings SET status='accepted' WHERE id=?", (finding_id,))
+    db.commit()
+    return jsonify({"ok": True, "excerpt_id": excerpt_id, "anchored": matched})
+
+
 @app.post("/api/export")
 def run_export():
-    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "export_dedoose.py")
+    """Run an export script: {"kind": "native"} (default) or {"kind": "dedoose"}."""
+    payload = request.get_json(silent=True) or {}
+    script_name = "export_dedoose.py" if payload.get("kind") == "dedoose" else "export_native.py"
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name)
     result = subprocess.run(
         [sys.executable, script_path], capture_output=True, text=True
     )
     if result.returncode != 0:
         return jsonify({"error": result.stderr[-2000:]}), 500
     return jsonify({"output": result.stdout})
+
+
+@app.get("/api/exports")
+def list_exports():
+    """Past export files, newest first."""
+    entries = []
+    if os.path.isdir(config.EXPORT_DIR):
+        for name in os.listdir(config.EXPORT_DIR):
+            path = os.path.join(config.EXPORT_DIR, name)
+            if os.path.isfile(path):
+                entries.append(
+                    {
+                        "name": name,
+                        "size": os.path.getsize(path),
+                        "modified": os.path.getmtime(path),
+                    }
+                )
+    entries.sort(key=lambda e: e["modified"], reverse=True)
+    return jsonify({"export_dir": config.EXPORT_DIR, "files": entries})
 
 
 if __name__ == "__main__":

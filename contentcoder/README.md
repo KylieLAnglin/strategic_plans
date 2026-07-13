@@ -34,8 +34,18 @@ Dependencies (all in the `strategic_plans` conda env): `pip install -r requireme
    (refused while a code has children or applications). **Every codebook change
    is archived** in the `code_history` table and exported as a "Change History"
    sheet in the codebook export.
-4. **Export** writes `DedooseChartExcerpts_{ts}.xlsx` + `DedooseCodesExport_{ts}.xlsx`
-   plus a timestamped `.db` backup.
+4. The **Export tab** writes the analysis files the pipeline consumes:
+   `applied_codes_{date}.csv` (one row per excerpt × applied code) and
+   `codebook_{date}.csv` (full codebook incl. category hierarchy and
+   `top_level_code`), plus the codebook change archive and a `.db` backup.
+   After exporting, pin the new date in `library/start.py`
+   (`LATEST_APPLIED_CODES` / `LATEST_CODEBOOK`). A legacy Dedoose-format
+   export is also available on the same tab for archival.
+5. **Hierarchy**: the Codebook tab supports drag-and-drop re-parenting.
+   Purple CATEGORY rows are display/analysis groupings (seeded once from
+   `code_crosswalk.xlsx` by `seed_hierarchy.py`): they define the `top_*`
+   columns in the analysis but are never applied to excerpts. Every move is
+   archived in `code_history`.
 
 ## One-time Dedoose migration
 
@@ -51,6 +61,30 @@ titles to local PDFs, and re-anchors each excerpt by fuzzy text matching
 (threshold 85). Unmatched excerpts land in the **Unanchored** queue (topbar):
 pick one, search the PDF, select the correct text, **Anchor to selection** —
 or **Mark document-level**.
+
+## LLM-assisted review (Review tab)
+
+The **Review** tab runs two AI quality checks via the Anthropic API
+(Message Batches, model set in `config.py` as `REVIEW_MODEL`):
+
+- **Find missing plans**: for a chosen code, Claude reads every in-sample plan
+  *without* that code and proposes verbatim passages that appear to warrant it.
+- **Audit existing excerpts**: Claude re-reads each excerpt carrying the code
+  against its definition and flags applications that don't fit.
+
+Everything is a proposal: findings queue up in the tab and change nothing
+until you Accept (which creates a properly-anchored excerpt with
+`excerpt_creator = "claude-assisted"`, or removes a code) or Reject. Costs are
+estimated before each run (typically well under $1 per code).
+
+**Setup (one-time):** get an Anthropic API key (platform.claude.com → API keys,
+billing required), then launch the server with the key in its environment,
+e.g. add `export ANTHROPIC_API_KEY=sk-ant-...` to `~/.zshenv` or to
+`LaunchContentCoder.command` before the server start line.
+
+`ocr_pdfs.py` (one-time, already run) added OCR text layers to scanned sample
+PDFs so both the LLM and the in-app text selection can read them; originals
+are in `final_pdfs_originals/`.
 
 ## Notes
 

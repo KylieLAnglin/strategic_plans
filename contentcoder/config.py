@@ -32,3 +32,21 @@ EXCERPT_CREATOR = "kylielanglin"
 
 HOST = "127.0.0.1"
 PORT = 8321
+
+# LLM-assisted review (Review tab). The API key is read from
+# ~/.anthropic_api_key (chmod 600, outside the git repo) unless
+# ANTHROPIC_API_KEY is already set. Batch pricing = 50% of standard.
+import os as _os
+
+_key_file = _os.path.expanduser("~/.anthropic_api_key")
+if "ANTHROPIC_API_KEY" not in _os.environ and _os.path.exists(_key_file):
+    with open(_key_file) as _f:
+        _os.environ["ANTHROPIC_API_KEY"] = _f.read().strip()
+
+REVIEW_MODEL = "claude-sonnet-5"
+REVIEW_PRICE_PER_MTOK_INPUT = 2.00    # Sonnet 5 intro pricing through 2026-08
+REVIEW_PRICE_PER_MTOK_OUTPUT = 10.00
+REVIEW_MAX_CODES_PER_RUN = 3          # plans are read once per run, so up to
+                                      # this many codes share one reading
+REVIEW_CONCURRENCY = 4                # parallel live API requests
+REVIEW_EXCERPT_CREATOR = "assisted"

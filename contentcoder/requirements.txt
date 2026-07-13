@@ -3,3 +3,4 @@ pymupdf
 rapidfuzz
 pandas
 openpyxl
+anthropic

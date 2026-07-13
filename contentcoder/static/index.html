@@ -12,6 +12,8 @@
   <nav id="tabs">
     <button class="tab active" data-tab="documents">Documents</button>
     <button class="tab" data-tab="codebook">Codebook</button>
+    <button class="tab" data-tab="review">Review</button>
+    <button class="tab" data-tab="export">Export</button>
   </nav>
   <span id="current-doc-title"></span>
   <span class="spacer"></span>
@@ -20,7 +22,6 @@
   <button id="btn-zoom-in" title="Zoom in">+</button>
   <button id="btn-unanchored">Unanchored <span id="unanchored-count"></span></button>
   <button id="btn-scan" title="Scan the PDF folder for new files">Scan PDFs</button>
-  <button id="btn-export" title="Write Dedoose-format export files">Export</button>
 </div>
 
 <!-- ================= Documents tab ================= -->
@@ -86,19 +87,102 @@
       <button id="btn-add-root-category" title="Add a category (display-only grouping, not exported)">＋ Category</button>
       <button id="btn-add-root-code" title="Add top-level code">＋ Code</button>
     </div>
+    <div id="codebook-stats">
+      <span id="codebook-counts"></span>
+      <button id="btn-expand-all" title="Expand all">Expand all</button>
+      <button id="btn-collapse-all" title="Collapse all">Collapse all</button>
+    </div>
     <div id="root-drop-zone" title="Drag a code here to make it top-level">⇱ drop here for top level</div>
     <ul id="manage-code-tree"></ul>
   </div>
   <div id="code-excerpts-panel">
     <div class="panel-heading"><span id="code-excerpts-title">Click a code to see its excerpts</span></div>
     <div id="code-definition" class="hidden">
+      <div id="code-display-line">Display name (used in tables): <b id="code-display-name"></b></div>
       <div id="code-def-row">
         <div id="code-def-text"></div>
+        <button id="btn-edit-definition" title="Edit display name and definition">✎ Edit</button>
         <button id="btn-code-history">History ▾</button>
+      </div>
+      <div id="code-def-editor" class="hidden">
+        <label class="review-field">Display name (used in tables)
+          <input id="code-display-input" type="text">
+        </label>
+        <label class="review-field">Definition
+          <textarea id="code-def-textarea" rows="5"></textarea>
+        </label>
+        <div>
+          <button id="btn-save-definition">Save</button>
+          <button id="btn-cancel-definition">Cancel</button>
+        </div>
       </div>
       <ul id="code-history-list" class="hidden"></ul>
     </div>
     <ul id="code-excerpt-list"></ul>
+  </div>
+</div>
+
+<!-- ================= Review tab ================= -->
+<div id="review-layout" class="tab-pane hidden">
+  <div id="review-controls">
+    <div class="export-card">
+      <h3>Run an AI review</h3>
+      <label class="review-field">Pipeline
+        <select id="review-kind">
+          <option value="missing">Find missing plans for a code</option>
+          <option value="audit">Audit existing excerpts of a code</option>
+        </select>
+      </label>
+      <div class="review-field">Codes (pick 1–3; each plan is read once for all of them)
+        <div id="review-code-checks"></div>
+      </div>
+      <p id="review-estimate">&nbsp;</p>
+      <details id="review-prompt-details">
+        <summary>Show the prompt this run will use</summary>
+        <div id="review-prompt-model"></div>
+        <pre id="review-prompt-text"></pre>
+        <div id="review-prompt-note" class="review-note"></div>
+      </details>
+      <button id="btn-review-run">Run review</button>
+      <p class="review-note">Proposals only — nothing changes your coding until
+        you accept it below. Runs use the Batches API and usually finish within
+        the hour.</p>
+    </div>
+    <div class="panel-heading">Jobs</div>
+    <ul id="review-job-list"></ul>
+  </div>
+  <div id="review-findings-panel">
+    <div class="panel-heading">Findings to review <span id="review-findings-count"></span></div>
+    <div id="review-findings"></div>
+  </div>
+</div>
+
+<!-- ================= Export tab ================= -->
+<div id="export-layout" class="tab-pane hidden">
+  <div id="export-actions">
+    <div class="export-card">
+      <h3>Analysis export</h3>
+      <p>Writes <code>applied_codes_{date}.csv</code> and <code>codebook_{date}.csv</code>
+        (plus the codebook change archive and a database backup).
+        The analysis pipeline reads these files — after exporting, pin the new
+        date in <code>library/start.py</code>.</p>
+      <button id="btn-export-native">Export for analysis</button>
+    </div>
+    <div class="export-card">
+      <h3>Dedoose-format archive (legacy)</h3>
+      <p>Writes <code>DedooseChartExcerpts_*.xlsx</code> and
+        <code>DedooseCodesExport_*.xlsx</code> in the original Dedoose layout,
+        for archival or compatibility.</p>
+      <button id="btn-export-dedoose">Export Dedoose format</button>
+    </div>
+    <pre id="export-output" class="hidden"></pre>
+  </div>
+  <div id="export-files">
+    <div class="panel-heading">Past exports <span id="export-dir-note"></span></div>
+    <table id="export-file-table">
+      <thead><tr><th>File</th><th>Date</th><th>Size</th></tr></thead>
+      <tbody></tbody>
+    </table>
   </div>
 </div>
 
