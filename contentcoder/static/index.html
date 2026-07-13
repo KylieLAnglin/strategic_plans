@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ContentCoder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div id="topbar">
+  <span id="app-title">ContentCoder</span>
+  <nav id="tabs">
+    <button class="tab active" data-tab="documents">Documents</button>
+    <button class="tab" data-tab="codebook">Codebook</button>
+  </nav>
+  <span id="current-doc-title"></span>
+  <span class="spacer"></span>
+  <button id="btn-zoom-out" title="Zoom out">−</button>
+  <span id="zoom-level">100%</span>
+  <button id="btn-zoom-in" title="Zoom in">+</button>
+  <button id="btn-unanchored">Unanchored <span id="unanchored-count"></span></button>
+  <button id="btn-scan" title="Scan the PDF folder for new files">Scan PDFs</button>
+  <button id="btn-export" title="Write Dedoose-format export files">Export</button>
+</div>
+
+<!-- ================= Documents tab ================= -->
+<div id="layout" class="tab-pane">
+  <div id="doc-panel">
+    <input id="doc-filter" type="search" placeholder="Filter documents…">
+    <div id="status-chips">
+      <button class="chip active" data-status="all">All</button>
+      <button class="chip" data-status="not_started">New</button>
+      <button class="chip" data-status="in_progress">Started</button>
+      <button class="chip" data-status="complete">Done</button>
+    </div>
+    <label id="sample-toggle"><input type="checkbox" id="sample-only" checked> Qual sample only</label>
+    <ul id="doc-list"></ul>
+  </div>
+
+  <div id="viewer-wrap">
+    <div id="doc-level-bar" class="hidden">
+      <b>Document-level codes:</b>
+      <span id="doc-level-chips"></span>
+    </div>
+    <div id="anchor-bar" class="hidden">
+      <div id="anchor-info">
+        <b>Anchoring excerpt:</b> <span id="anchor-excerpt-text"></span>
+        <span id="anchor-original-range"></span>
+      </div>
+      <input id="anchor-search" type="search" placeholder="Search PDF text…">
+      <span id="anchor-search-status"></span>
+      <button id="anchor-prev">◀</button>
+      <button id="anchor-next">▶</button>
+      <button id="anchor-save" disabled>Anchor to selection</button>
+      <button id="anchor-doc-level">Mark document-level</button>
+      <button id="anchor-cancel">Cancel</button>
+    </div>
+    <div id="viewer"></div>
+    <div id="viewer-empty">Select a document to begin coding.</div>
+  </div>
+
+  <div id="side-panel">
+    <div id="excerpt-editor" class="hidden">
+      <div id="editor-heading"></div>
+      <div id="editor-text"></div>
+      <div id="editor-codes"></div>
+      <div class="panel-heading">Apply codes</div>
+      <ul id="editor-code-tree"></ul>
+      <div id="editor-buttons">
+        <button id="btn-save-excerpt">Save</button>
+        <button id="btn-delete-excerpt" class="danger hidden">Delete</button>
+        <button id="btn-cancel-excerpt">Cancel</button>
+      </div>
+    </div>
+    <div id="excerpts-panel">
+      <div class="panel-heading">Codes applied to this PDF <span id="excerpt-count"></span></div>
+      <ul id="excerpt-list"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Codebook tab ================= -->
+<div id="codebook-layout" class="tab-pane hidden">
+  <div id="codebook-manage-panel">
+    <div class="panel-heading">Codebook
+      <button id="btn-add-root-category" title="Add a category (display-only grouping, not exported)">＋ Category</button>
+      <button id="btn-add-root-code" title="Add top-level code">＋ Code</button>
+    </div>
+    <div id="root-drop-zone" title="Drag a code here to make it top-level">⇱ drop here for top level</div>
+    <ul id="manage-code-tree"></ul>
+  </div>
+  <div id="code-excerpts-panel">
+    <div class="panel-heading"><span id="code-excerpts-title">Click a code to see its excerpts</span></div>
+    <div id="code-definition" class="hidden">
+      <div id="code-def-row">
+        <div id="code-def-text"></div>
+        <button id="btn-code-history">History ▾</button>
+      </div>
+      <ul id="code-history-list" class="hidden"></ul>
+    </div>
+    <ul id="code-excerpt-list"></ul>
+  </div>
+</div>
+
+<div id="unanchored-view" class="hidden">
+  <div class="panel-heading">Unanchored excerpts
+    <button id="btn-close-unanchored">Close</button>
+  </div>
+  <table id="unanchored-table">
+    <thead><tr><th>Document</th><th>Excerpt text</th><th>Original range</th><th>Codes</th><th></th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>
