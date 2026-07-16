@@ -1,18 +1,16 @@
 # %%
-import re
-
 import pandas as pd
-import numpy as np
 from strategic_plans.library import start
 
 
 # %%
 
 df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_codes.csv")
-codebook_df = pd.read_excel(start.DATA_DIR + "raw/Dedoose Exports/DedooseCodesExport_2025_8_2_721.xlsx")
 
-codebook_df = codebook_df.rename(columns={"Id": "code_id", "Parent Id": "parent_id", "Title": "code_title", "Description": "code_description"})
-codebook_df["parent_id"] = np.where(codebook_df["parent_id"].isnull(), codebook_df.code_id, codebook_df["parent_id"])
+# The ContentCoder codebook export is the codebook of record: its code_column
+# and levelN_column values are exactly the column names in plans_codes.csv, so
+# titles and descriptions map directly (no Dedoose-era fuzzy matching needed)
+codebook_df = pd.read_csv(start.LATEST_CODEBOOK)
 
 # %%
 # Filter to student_subgroups codes and special cases (exclude title columns)
@@ -47,95 +45,6 @@ subgroup_count["all_districts_rank"] = subgroup_count.count_plans.rank(
     ascending=False, method="min"
 )
 
-# Debug: Check what title columns exist
-title_cols = [col for col in df.columns if col.endswith("_title")]
-print(f"Found {len(title_cols)} title columns")
-
-# Add code titles from the existing title columns in the dataset
-subgroup_count['code_title'] = None
-missing_titles = []
-
-for subgroup in subgroup_count.index:
-    title_col = subgroup + '_title'
-    if title_col in df.columns:
-        # Get the first non-null title value for this code
-        title_value = df[title_col].dropna().iloc[0] if not df[title_col].dropna().empty else None
-        subgroup_count.loc[subgroup, 'code_title'] = title_value
-    else:
-        # For hierarchical codes, try to find the child code title
-        # Extract different possible suffixes to match against
-        subgroup_parts = subgroup.replace("code_", "").replace("_applied", "").split("_")
-        
-        found = False
-        # Try progressively shorter suffixes from the end
-        for i in range(len(subgroup_parts)):
-            suffix = "_".join(subgroup_parts[i:])
-            potential_title_col = f"code_{suffix}_applied_title"
-            
-            if potential_title_col in df.columns:
-                title_value = df[potential_title_col].dropna().iloc[0] if not df[potential_title_col].dropna().empty else None
-                subgroup_count.loc[subgroup, 'code_title'] = title_value
-                found = True
-                break
-        
-        if not found:
-            missing_titles.append(subgroup)
-
-print(f"Missing titles for {len(missing_titles)} subgroups:")
-for missing in missing_titles[:10]:  # Show first 10
-    print(f"  {missing}")
-
-# For subgroups with null titles, try to get titles from the codebook as fallback
-# Create the same clean code mapping as in 02_import_codes.py
-patterns = ["\s+", "-", ",+", "_+", "/+", r"\\", "'", r"\(", r"\)", "&", r"\.", ":", ";"]
-regex_pattern = "|".join(patterns)
-
-codebook_df["clean_code_title"] = codebook_df["code_title"].str.replace(regex_pattern, "_", regex=True)
-codebook_df["clean_code_title"] = codebook_df["clean_code_title"].str.replace("_+", "_", regex=True)
-codebook_df["clean_code_title"] = codebook_df["clean_code_title"].str.strip("_")
-codebook_df["clean_code_title"] = codebook_df["clean_code_title"].str.lower()
-
-# Add code_description column
-subgroup_count['code_description'] = None
-
-# Fill in missing titles and descriptions from codebook
-for subgroup in subgroup_count.index:
-    if pd.isnull(subgroup_count.loc[subgroup, 'code_title']) or subgroup_count.loc[subgroup, 'code_title'] == '':
-        # Extract the core code name (remove code_ prefix and _applied suffix)
-        clean_subgroup = subgroup.replace("code_", "").replace("_applied", "")
-        
-        # For hierarchical codes, try matching different parts
-        subgroup_parts = clean_subgroup.split("_")
-        
-        # Try matching progressively shorter suffixes
-        for i in range(len(subgroup_parts)):
-            suffix = "_".join(subgroup_parts[i:])
-            match = codebook_df[codebook_df['clean_code_title'] == suffix]
-            
-            if not match.empty:
-                subgroup_count.loc[subgroup, 'code_title'] = match.iloc[0]['code_title']
-                subgroup_count.loc[subgroup, 'code_description'] = match.iloc[0]['code_description']
-                print(f"Found title from codebook for {subgroup}: {match.iloc[0]['code_title']}")
-                break
-    else:
-        # Even if title exists, try to get description
-        clean_subgroup = subgroup.replace("code_", "").replace("_applied", "")
-        subgroup_parts = clean_subgroup.split("_")
-        
-        for i in range(len(subgroup_parts)):
-            suffix = "_".join(subgroup_parts[i:])
-            match = codebook_df[codebook_df['clean_code_title'] == suffix]
-            
-            if not match.empty:
-                subgroup_count.loc[subgroup, 'code_description'] = match.iloc[0]['code_description']
-                break
-
-# Final check
-null_titles = subgroup_count[subgroup_count['code_title'].isnull()].index.tolist()
-print(f"\nStill missing titles: {len(null_titles)}")
-for missing in null_titles[:5]:
-    print(f"  {missing}")
-
 # %%
 # Address problem with parent and community codes (same as in 02_import_codes.py)
 
@@ -158,7 +67,7 @@ if parent_community_subgroup_codes:
             correct_col = "code_family_and_community_community_connection_and_buy_in_applied"
             if correct_col in df_with_corrections.columns:
                 df[orig_col] = df_with_corrections[correct_col].fillna(0)
-        elif "parent_communication_and_involvement" in orig_col:
+        elif "family_communication_and_involvement" in orig_col:
             correct_col = "code_family_and_community_parent_communication_and_involvement_applied"
             if correct_col in df_with_corrections.columns:
                 df[orig_col] = df_with_corrections[correct_col].fillna(0)
@@ -175,6 +84,28 @@ if parent_community_subgroup_codes:
     subgroup_count["all_districts_rank"] = subgroup_count.count_plans.rank(ascending=False, method="min")
     
     print("Recalculated subgroup counts with parent/community code corrections")
+
+# %%
+# Map titles and descriptions from the codebook export. A subgroup column is
+# either a per-code column (code_column) or a node's aggregate column (the
+# levelN_column at its own depth), both named by the export itself.
+title_by_column = {}
+description_by_column = {}
+for _, codebook_row in codebook_df.iterrows():
+    own_level_column = codebook_row[f"level{int(codebook_row.level)}_column"]
+    for column_name in (codebook_row.code_column, own_level_column):
+        if isinstance(column_name, str) and column_name:
+            title_by_column[column_name] = codebook_row.code_title
+            description_by_column[column_name] = codebook_row.description
+
+subgroup_count["code_title"] = [title_by_column.get(subgroup) for subgroup in subgroup_count.index]
+subgroup_count["code_description"] = [description_by_column.get(subgroup) for subgroup in subgroup_count.index]
+
+missing_titles = [subgroup for subgroup in subgroup_count.index if subgroup not in title_by_column]
+assert not missing_titles, (
+    f"Subgroup columns missing from the codebook export (stale export? "
+    f"re-export from the app and update library/start.py): {missing_titles}"
+)
 
 # %%
 subgroup_count[["code_title", "code_description", "count_plans", "proportion", "all_districts_rank"]].to_excel(start.MAIN_DIR + "results/subgroup_counts.xlsx")

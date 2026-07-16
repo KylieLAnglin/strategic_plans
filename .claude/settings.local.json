@@ -5,7 +5,21 @@
       "Bash(python3:*)",
       "Bash(python *)",
       "Read(//Users/kylie.anglin/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/data/**)",
-      "Read(//Users/kylie.anglin/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/data/raw/**)"
+      "Read(//Users/kylie.anglin/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/data/raw/**)",
+      "Bash(cp __TRACKED_VAR__/applied_codes_2026_07_14.csv __TRACKED_VAR__/codebook_2026_07_14.csv /private/tmp/claude-502/-Users-kylie-anglin-strategic-plans/5f4c32e5-80db-4ea0-8720-79596444cbe9/scratchpad/before/)",
+      "Bash(cp __TRACKED_VAR__/goal_count.xlsx __TRACKED_VAR__/high_level_frequency.xlsx /private/tmp/claude-502/-Users-kylie-anglin-strategic-plans/5f4c32e5-80db-4ea0-8720-79596444cbe9/scratchpad/before/)",
+      "Bash(cp '/Users/kylie.anglin/Library/CloudStorage/OneDrive-UniversityofConnecticut/Documents - strategic_plans/data/clean/plans_codes.csv' /private/tmp/claude-502/-Users-kylie-anglin-strategic-plans/5f4c32e5-80db-4ea0-8720-79596444cbe9/scratchpad/before/)",
+      "Bash(ls /private/tmp/claude-502/-Users-kylie-anglin-strategic-plans/5f4c32e5-80db-4ea0-8720-79596444cbe9/scratchpad/before/)",
+      "Skill(claude-api)",
+      "Bash(node --check contentcoder/static/app.js)",
+      "Bash(lsof -nP -iTCP:8321 -sTCP:LISTEN)",
+      "Bash(/opt/anaconda3/envs/strategic_plans/bin/python -c \"import strategic_plans.library.start as s; print\\(s.LATEST_APPLIED_CODES\\)\")",
+      "Bash(curl -s http://127.0.0.1:8321/api/update-results/status)",
+      "Bash(curl -s -X POST http://127.0.0.1:8321/api/update-results)",
+      "Bash(break)",
+      "Bash(/opt/anaconda3/envs/strategic_plans/bin/python -c ' *)",
+      "Bash(pwd -P)",
+      "Bash(/opt/anaconda3/envs/strategic_plans/bin/python *)"
     ],
     "deny": []
   }

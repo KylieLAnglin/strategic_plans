@@ -1,5 +1,4 @@
-# The ContentCoder app is developed/versioned separately from the paper's
-# analysis code; keep this repo focused on strategic_plans/
+
 contentcoder/
 
 __pycache__/
@@ -8,3 +7,4 @@ __pycache__/
 local_data/
 
 strategic_plans/02_topic_modeling/04_apply_sample_topic_models.py
+.claude/settings.local.json

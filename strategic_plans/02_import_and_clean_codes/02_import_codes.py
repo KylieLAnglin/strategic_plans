@@ -8,14 +8,13 @@
     - Imports the applied-codes file (one row per excerpt x applied code)
     - Builds document-level code indicators, then aggregates codes at the
   district level using groupby().max()
-    - Cleans code paths into column names (removes spaces, special characters)
-    - Creates top-level code columns from the ContentCoder codebook hierarchy
-  (category groupings are editable in the app's Codebook tab and flow
-  through here on the next export)
+    - Takes variable names (code_column, level1/2/3_column), table-ready
+  code titles, and level groupings directly from the codebook export, so
+  renaming or reorganizing codes in the app's Codebook tab flows through
+  here on the next export (no crosswalk file needed)
     - Outputs: plans_codes.csv (final coded dataset)
 """
 import pandas as pd
-import re
 from strategic_plans.library import start
 import numpy as np
 
@@ -29,33 +28,18 @@ meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/contentcoder_doc_df.csv"
 applied_df = pd.read_csv(start.LATEST_APPLIED_CODES)
 print(f"Number of unique media titles in code data: {applied_df['media_title'].nunique()}")
 
-# The codebook (definitions, hierarchy, and top-level category groupings)
+# The codebook of record (definitions, hierarchy, display names, and the
+# analysis variable names): code_column and top_level_column are built by
+# the app's exporter from code titles, so renames in the app rename the
+# analysis variables here
 codebook_df = pd.read_csv(start.LATEST_CODEBOOK)
 codebook_df = codebook_df[codebook_df.is_category == 0]
 print(f"Number of unique codes in codebook: {len(codebook_df)}")
 
-# Import the crosswalk: maps each analyzed code column to its display name
-# and type (goal vs subgroup); still the record of display-name decisions
-crosswalk_df = pd.read_excel(start.CROSSWALK_FILE)
+assert codebook_df.code_column.notna().all(), "codebook export missing code_column values"
+assert codebook_df.code_column.is_unique, "duplicate code_column values in codebook export"
 
-# %% Process codebook for clean code names
-# Define patterns to standardize code names (spaces, punctuation, etc. become underscores)
-patterns = [r"\s+", r"-", r",+", r"_+", r"/+", r"\\", r"'", r"\(", r"\)", r"&", r"\.", r":", r";"]
-regex_pattern = "|".join(patterns)
-
-# Create clean, standardized code column names from code paths (the
-# non-category hierarchy path, e.g. 'Student Subgroups\At-Risk', so child
-# codes keep their parent-prefixed column names)
-codebook_df["code_column"] = (
-    "code_"
-    + codebook_df.code_path.str.replace(regex_pattern, "_", regex=True)
-    .str.replace("_+", "_", regex=True)
-    .str.strip("_")
-    .str.lower()
-    + "_applied"
-)
-
-print("Examples of code name cleaning:")
+print("Examples of code column names from the codebook export:")
 for _, row in codebook_df.head(6).iterrows():
     print(f"  {row.code_path} -> {row.code_column}")
 
@@ -74,7 +58,7 @@ code_df = (
     .reset_index()
 )
 
-# Codes never applied still need columns (crosswalk validation demands completeness)
+# Codes never applied still need columns (codebook validation demands completeness)
 for code_column in codebook_df.code_column:
     if code_column not in code_df.columns:
         code_df[code_column] = 0
@@ -137,10 +121,10 @@ df_final["code_community_connection_and_buy_in_applied"] = np.where(
     1,
     df_final["code_community_connection_and_buy_in_applied"],
 )
-df_final["code_parent_communication_and_involvement_applied"] = np.where(
+df_final["code_family_communication_and_involvement_applied"] = np.where(
     df_final["code_family_and_community_parent_communication_and_involvement_applied"].fillna(0) == 1,
     1,
-    df_final["code_parent_communication_and_involvement_applied"],
+    df_final["code_family_communication_and_involvement_applied"],
 )
 df_final = df_final.drop(columns=KEEP_COLUMNS[1:])
 
@@ -177,56 +161,66 @@ columns_to_drop = [
 
 
 df_final = df_final.drop(columns=columns_to_drop, errors="ignore")
-# %% Validate code columns against the crosswalk
-# Every applied code column must have a crosswalk row and vice versa; failing
-# loudly here catches renames/additions in the codebook the day they appear
+# %% Validate code columns against the codebook export
+# Every applied code column must have a codebook row and vice versa (minus
+# the codes deliberately removed above); failing loudly here catches a
+# mismatch between the pinned applied-codes and codebook exports
 code_columns = [col for col in df_final.columns if "code_" in col and "applied" in col]
 
 duplicated_columns = df_final.columns[df_final.columns.duplicated()].tolist()
 assert not duplicated_columns, f"Duplicate columns in final dataset: {duplicated_columns}"
 
-columns_missing_from_crosswalk = sorted(set(code_columns) - set(crosswalk_df.code_column))
-crosswalk_rows_missing_from_data = sorted(set(crosswalk_df.code_column) - set(code_columns))
-assert not columns_missing_from_crosswalk, (
-    f"Code columns with no crosswalk row (new or renamed code in ContentCoder? "
-    f"add to {start.CROSSWALK_FILE}): {columns_missing_from_crosswalk}"
+expected_code_columns = set(codebook_df.code_column) - set(CODES_TO_REMOVE)
+columns_missing_from_codebook = sorted(set(code_columns) - expected_code_columns)
+codebook_rows_missing_from_data = sorted(expected_code_columns - set(code_columns))
+assert not columns_missing_from_codebook, (
+    f"Code columns with no codebook row (stale codebook export? re-export "
+    f"from the app and update library/start.py): {columns_missing_from_codebook}"
 )
-assert not crosswalk_rows_missing_from_data, (
-    f"Crosswalk rows with no matching code column (code removed or renamed "
-    f"in ContentCoder?): {crosswalk_rows_missing_from_data}"
+assert not codebook_rows_missing_from_data, (
+    f"Codebook rows with no matching code column (stale applied-codes "
+    f"export?): {codebook_rows_missing_from_data}"
 )
-print(f"Crosswalk validation passed: {len(code_columns)} code columns all matched")
+print(f"Codebook validation passed: {len(code_columns)} code columns all matched")
 
 # %% Add code titles for reference
-# Titles come from the crosswalk so they survive renames in the codebook
-crosswalk_titles = crosswalk_df.set_index("code_column")["dedoose_title"]
+# Titles come from the app's Codebook tab (the code title doubles as the
+# table-ready name)
+codebook_titles = codebook_df.set_index("code_column")["code_title"]
 for code_col in code_columns:
-    df_final[code_col + "_title"] = crosswalk_titles[code_col]
+    df_final[code_col + "_title"] = codebook_titles[code_col]
 print(f"Added titles for {len(code_columns)} code columns")
 
-# %% Create top-level code columns from the ContentCoder codebook hierarchy
-# A district gets a top-level code if any member code applied. Membership is
-# the category grouping in the app's Codebook tab (editable, archived), so
-# rearranging the hierarchy there changes these columns on the next export.
-top_level_codebook = codebook_df[codebook_df.top_level_code.notna() & (codebook_df.top_level_code != "")]
+# %% Create level aggregate columns from the ContentCoder codebook hierarchy
+# The codebook allows up to four levels (level1 > ... > level4; some
+# branches use fewer). Every node gets one aggregate column: a district gets
+# levelN_x_applied if the node's own code or any code nested under it
+# applied. Names come from node titles in the app's Codebook tab, so
+# renaming or rearranging codes there changes these columns on the next
+# export. The level count comes from the export itself (level1_column,
+# level2_column, ...), so a deeper codebook flows through automatically.
+level_count = len([col for col in codebook_df.columns if col.startswith("level") and col.endswith("_column")])
+print(f"Codebook export supports {level_count} levels")
 
-for top_level_code in top_level_codebook.top_level_code.unique():
-    member_columns = top_level_codebook[
-        top_level_codebook.top_level_code == top_level_code
-    ].code_column.tolist()
-    member_columns = [col for col in member_columns if col in df_final.columns]
-
-    clean_top_level = re.sub(regex_pattern + r"|\+", "_", top_level_code)
-    clean_top_level = re.sub("_+", "_", clean_top_level).strip("_").lower()
-    top_level_column = "top_" + clean_top_level + "_applied"
-
-    df_final[top_level_column] = df_final[member_columns].max(axis=1)
-    print(
-        f"{top_level_column}: {int(df_final[top_level_column].sum())} districts "
-        f"({len(member_columns)} member codes)"
-    )
+for level_number in range(1, level_count + 1):
+    level_column_assignments = codebook_df[f"level{level_number}_column"]
+    for level_column in sorted(level_column_assignments.dropna().unique()):
+        member_columns = codebook_df.loc[
+            level_column_assignments == level_column, "code_column"
+        ].tolist()
+        member_columns = [col for col in member_columns if col in df_final.columns]
+        if not member_columns:
+            print(f"{level_column}: no member codes with data, skipped")
+            continue
+        df_final[level_column] = df_final[member_columns].max(axis=1)
+        print(
+            f"{level_column}: {int(df_final[level_column].sum())} districts "
+            f"({len(member_columns)} member codes)"
+        )
 
 # %% Sanity-check counts against the previous version of the dataset
+# A missing or unreadable previous file (OneDrive has corrupted files in this
+# directory before) only skips the comparison; it must not block regeneration
 previous_path = start.MAIN_DIR + "data/clean/plans_codes.csv"
 try:
     previous_df = pd.read_csv(previous_path)
@@ -238,6 +232,8 @@ try:
                 print(f"Count changed for {code_col}: {int(previous_count)} -> {int(new_count)}")
 except FileNotFoundError:
     print("No previous plans_codes.csv to compare against")
+except (pd.errors.ParserError, UnicodeDecodeError, OSError) as previous_read_error:
+    print(f"Could not read previous plans_codes.csv ({previous_read_error}); skipping count comparison")
 
 # %% Save final dataset
 output_path = start.MAIN_DIR + "data/clean/plans_codes.csv"

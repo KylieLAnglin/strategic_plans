@@ -7,7 +7,6 @@ from strategic_plans.library import start
 # ------------------ Config ------------------
 N_PER_TOPIC = 5
 RANDOM_STATE = 42
-EXCLUDED_PARENT_CODES = {"Uninterpretable", "Document Details"}
 
 # ------------------ Load data ------------------
 topic_naming_path = os.path.join(start.DATA_DIR, "final_model/topic_naming_named.xlsx")
@@ -17,12 +16,32 @@ naming_df = pd.read_excel(topic_naming_path)
 naming_df = naming_df.rename(columns={"Unnamed: 0": "topic_id"})
 naming_df["topic_id_space"] = naming_df["topic_id"].str.replace("_", " ", regex=False)
 
-# Keep included topics
-included_meta = naming_df[~naming_df["parent_code"].isin(EXCLUDED_PARENT_CODES)].copy()
+# Topic curation (inclusion, merges) is chosen in the ContentCoder app and
+# lands here through its topics export (contentcoder/export_topics.py)
+assert {"include_in_analysis", "merged_into"} <= set(naming_df.columns), (
+    "topic_naming_named.xlsx predates the app's topics export; "
+    "run contentcoder/export_topics.py to regenerate it"
+)
+
+merged_meta = naming_df[naming_df["merged_into"].notna() & (naming_df["merged_into"] != "")]
+
+# Keep included topics (chosen per group in the app's LDA tab)
+included_meta = naming_df[
+    (naming_df["include_in_analysis"] == 1)
+    & ~naming_df["topic_id"].isin(merged_meta["topic_id"])
+].copy()
 
 # Load segment-level doc-topic matrix
 doc_topics_path = os.path.join(start.DATA_DIR, "final_model/topic_model/doc_topics.csv")
 doc_df = pd.read_csv(doc_topics_path)
+
+# Fold merged topics into their canonical topic (prevalences sum); the columns
+# here are the bare topic numbers "0".."22"
+for _, merged_topic in merged_meta.iterrows():
+    source_col = merged_topic["topic_id"].replace("Topic_", "")
+    target_col = merged_topic["merged_into"].replace("Topic_", "")
+    doc_df[target_col] = doc_df[target_col] + doc_df[source_col]
+    doc_df = doc_df.drop(columns=[source_col])
 
 # Identify topic columns
 topic_cols = [str(i) for i in range(23)]  # "0".."22"

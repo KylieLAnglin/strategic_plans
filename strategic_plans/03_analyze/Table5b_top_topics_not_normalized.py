@@ -23,6 +23,24 @@ topic_cols = [str(i) for i in range(23)]
 rename_dict = {col: f'Topic {int(col)}' for col in topic_cols}
 doc_topics_df = doc_topics_df.rename(columns=rename_dict)
 
+# Topic curation (inclusion, merges) is chosen in the ContentCoder app and
+# lands here through its topics export (contentcoder/export_topics.py)
+assert {'include_in_analysis', 'merged_into'} <= set(topic_naming_df.columns), (
+    "topic_naming_named.xlsx predates the app's topics export; "
+    "run contentcoder/export_topics.py to regenerate it"
+)
+
+# Fold merged topics into their canonical topic (prevalences sum) and drop the
+# source columns; the prevalence loop below then skips the merged topics
+merged_topics_meta = topic_naming_df[
+    topic_naming_df['merged_into'].notna() & (topic_naming_df['merged_into'] != '')
+]
+for _, merged_topic in merged_topics_meta.iterrows():
+    target_col = merged_topic['merged_into'].replace("_", " ")
+    source_col = merged_topic['topic_id'].replace("_", " ")
+    doc_topics_df[target_col] = doc_topics_df[target_col] + doc_topics_df[source_col]
+    doc_topics_df = doc_topics_df.drop(columns=[source_col])
+
 # %%
 # Calculate average prevalence, 25th percentile, and 75th percentile
 topic_prevalence = []
@@ -51,9 +69,8 @@ prevalence_df = pd.DataFrame(topic_prevalence)
 # Merge with topic naming data
 table_df = prevalence_df.merge(topic_naming_df, on='topic_id', how='left')
 
-# Filter out excluded parent codes
-excluded_parent_codes = ["Uninterpretable", "Document Details"]
-table_df = table_df[~table_df['parent_code'].isin(excluded_parent_codes)]
+# Keep only topics included in analysis (chosen per group in the app's LDA tab)
+table_df = table_df[table_df['include_in_analysis'] == 1]
 
 # Sort by decreasing prevalence
 table_df = table_df.sort_values('avg_prevalence', ascending=False)

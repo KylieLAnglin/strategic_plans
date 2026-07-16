@@ -22,13 +22,31 @@ topic_cols = [str(i) for i in range(23)]  # adjust if your model has a different
 doc_topics_df = doc_topics_df.rename(columns={c: f"Topic {int(c)}" for c in topic_cols})
 
 # ------------------ Identify included topics ------------------
-# Exclude uninterpretable / document details
-excluded_parent_codes = {"Uninterpretable", "Document Details"}
+# Topic curation (inclusion, merges) is chosen in the ContentCoder app and
+# lands here through its topics export (contentcoder/export_topics.py)
+assert {'include_in_analysis', 'merged_into'} <= set(topic_naming_df.columns), (
+    "topic_naming_named.xlsx predates the app's topics export; "
+    "run contentcoder/export_topics.py to regenerate it"
+)
 
 # topic_naming_df['topic_id'] uses underscores: "Topic_0". Convert to space-form to match doc_topics_df columns.
 topic_naming_df['topic_id_space'] = topic_naming_df['topic_id'].str.replace("_", " ", regex=False)
 
-included_topics_meta = topic_naming_df[~topic_naming_df['parent_code'].isin(excluded_parent_codes)].copy()
+# Fold merged topics into their canonical topic (prevalences sum) and drop the
+# source columns so nothing below can use pre-merge values
+merged_topics_meta = topic_naming_df[
+    topic_naming_df['merged_into'].notna() & (topic_naming_df['merged_into'] != '')
+]
+for _, merged_topic in merged_topics_meta.iterrows():
+    target_col = merged_topic['merged_into'].replace("_", " ")
+    source_col = merged_topic['topic_id_space']
+    doc_topics_df[target_col] = doc_topics_df[target_col] + doc_topics_df[source_col]
+    doc_topics_df = doc_topics_df.drop(columns=[source_col])
+
+included_topics_meta = topic_naming_df[
+    (topic_naming_df['include_in_analysis'] == 1)
+    & ~topic_naming_df['topic_id'].isin(merged_topics_meta['topic_id'])
+].copy()
 
 # Keep only topics present in doc_topics_df
 included_topic_cols = [t for t in included_topics_meta['topic_id_space'].tolist() if t in doc_topics_df.columns]
@@ -68,8 +86,8 @@ summary_df = pd.DataFrame(topic_summary)
 # ------------------ Merge with names / codes / words ------------------
 table_df = summary_df.merge(topic_naming_df, on='topic_id', how='left')
 
-# Filter again for safety (keep only included parent codes)
-table_df = table_df[~table_df['parent_code'].isin(excluded_parent_codes)]
+# Filter again for safety (keep only included topics)
+table_df = table_df[table_df['topic_id'].isin(included_topics_meta['topic_id'])]
 
 # Sort by decreasing normalized average prevalence
 table_df = table_df.sort_values('avg_norm_prevalence', ascending=False)

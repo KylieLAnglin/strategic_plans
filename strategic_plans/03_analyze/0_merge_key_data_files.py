@@ -84,14 +84,33 @@ df = df.merge(text_df[["leaid", "word_count"]], on="leaid", how='left')
 
 # %%
 # Add normalized topic prevalence columns
-# Load topic naming to identify included topics (same approach as Table5b)
+# Topic curation (names, inclusion, merges) is chosen in the ContentCoder app
+# and lands here through its topics export (contentcoder/export_topics.py)
 topic_naming_path = start.DATA_DIR + 'final_model/topic_naming_named.xlsx'
 topic_naming_df = pd.read_excel(topic_naming_path)
 topic_naming_df = topic_naming_df.rename(columns={'Unnamed: 0': 'topic_id'})
+assert {'include_in_analysis', 'merged_into'} <= set(topic_naming_df.columns), (
+    "topic_naming_named.xlsx predates the app's topics export; "
+    "run contentcoder/export_topics.py to regenerate it"
+)
 
-# Identify included topics (exclude uninterpretable / document details)
-excluded_parent_codes = {"Uninterpretable", "Document Details"}
-included_topics_meta = topic_naming_df[~topic_naming_df['parent_code'].isin(excluded_parent_codes)]
+# Fold merged topics into their canonical topic: a chunk's topic prevalences
+# are a distribution over topics, so the merged share is the sum. The source
+# column is dropped so a stale hardcoded reference to a merged topic in a
+# downstream table fails loudly instead of using pre-merge values.
+merged_topics_meta = topic_naming_df[
+    topic_naming_df['merged_into'].notna() & (topic_naming_df['merged_into'] != '')
+]
+for _, merged_topic in merged_topics_meta.iterrows():
+    df[merged_topic['merged_into']] = df[merged_topic['merged_into']] + df[merged_topic['topic_id']]
+    df = df.drop(columns=[merged_topic['topic_id']])
+    print(f"Folded {merged_topic['topic_id']} into {merged_topic['merged_into']}")
+
+# Identify included topics (chosen per group in the app's LDA tab)
+included_topics_meta = topic_naming_df[
+    (topic_naming_df['include_in_analysis'] == 1)
+    & ~topic_naming_df['topic_id'].isin(merged_topics_meta['topic_id'])
+]
 
 # Get topic columns and filter to included ones
 topic_cols = [col for col in df.columns if col.startswith('Topic_')]
