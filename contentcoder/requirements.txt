@@ -1,6 +1,0 @@
-flask
-pymupdf
-rapidfuzz
-pandas
-openpyxl
-anthropic
