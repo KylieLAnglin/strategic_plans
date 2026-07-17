@@ -12,24 +12,27 @@
     - Outputs: contentcoder_doc_df.csv, links district info to media_title,
   date_coded, and coder
 """
-# %%
-import re
-
 import pandas as pd
-import numpy as np
 
 from strategic_plans.library import start
 
 # %%
-meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/plans_meta_data_full.csv")
-meta_data_df = meta_data_df[meta_data_df.include_qual == 1]
+# ------------------ SETUP ------------------
+META_DATA_PATH = start.MAIN_DIR + "data/clean/plans_meta_data_full.csv"
+OUTPUT_PATH = start.MAIN_DIR + "data/clean/contentcoder_doc_df.csv"
+CODERS = ["mikayla.clemens", "JuliaOas", "kylielanglin"]
+
 # %%
-# ContentCoder export: one row per excerpt x applied code; pinned in start.py
+# ------------------ LOAD METADATA ------------------
+meta_data_df = pd.read_csv(META_DATA_PATH)
+meta_data_df = meta_data_df[meta_data_df.include_qual == 1]
+
+# %%
+# ------------------ LOAD APPLIED CODES ------------------
 code_df = pd.read_csv(start.LATEST_APPLIED_CODES)
 
 code_df = code_df.rename(columns={"excerpt_creator": "coder"})
-coders = ["mikayla.clemens", "JuliaOas", "kylielanglin"]
-code_df = code_df[code_df.coder.isin(coders)]
+code_df = code_df[code_df.coder.isin(CODERS)]
 code_df["lea"] = code_df.media_title.str.replace(".pdf", "")
 
 # Format the ISO date back to the M/D/YYYY style used in the metadata files
@@ -43,11 +46,9 @@ code_df["date_coded"] = (
 )
 
 # %%
-# One row per document: the first coded excerpt supplies date_coded and coder
+# ------------------ BUILD DOCUMENT-LEVEL DATASET ------------------
 doc_df = code_df[["media_title", "date_coded", "coder", "lea"]].drop_duplicates()
 doc_df = doc_df.drop_duplicates(subset="lea")
-
-# %%
 
 contentcoder_doc_df = meta_data_df.merge(
     doc_df,
@@ -57,10 +58,8 @@ contentcoder_doc_df = meta_data_df.merge(
     indicator="_merge_qual",
 )
 
-# %%
 contentcoder_doc_df._merge_qual.value_counts()
 
-# %%
 contentcoder_doc_df = contentcoder_doc_df[contentcoder_doc_df._merge_qual == "both"]
 contentcoder_doc_df = contentcoder_doc_df.drop(
     columns=[
@@ -77,4 +76,7 @@ contentcoder_doc_df = contentcoder_doc_df.drop(
     errors="ignore",
 )
 
-contentcoder_doc_df.to_csv(start.MAIN_DIR + "data/clean/contentcoder_doc_df.csv", index=False)
+# %%
+# ------------------ SAVE ------------------
+contentcoder_doc_df.to_csv(OUTPUT_PATH, index=False)
+print(f"Saved: {OUTPUT_PATH}")

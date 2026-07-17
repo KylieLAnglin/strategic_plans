@@ -16,27 +16,18 @@ print(f"Analyzing {len(top_topics_df)} topics")
 print(f"Number of districts: {len(merge_df)}")
 
 # %%
-# Create combined Academic Achievement topic (Topic_9 + Topic_16)
-merge_df['Academic_Achievement'] = merge_df['Topic_9'] + merge_df['Topic_16']
+# Grouping, names, inclusion, and merges are all chosen in the ContentCoder app
+# and flow here through top_topics.xlsx (see Table5b). Groups follow the app's
+# LDA-tab order (Group Order); topics within a group are ordered by prevalence.
+top_topics_df = top_topics_df.sort_values(
+    ["Group Order", "Average Prevalence"], ascending=[True, False]
+)
+TOPIC_GROUPS = []
+for group_name, group_rows in top_topics_df.groupby("Parent Code", sort=False):
+    members = list(group_rows["Topic ID"])
+    TOPIC_GROUPS.append((group_name, members))
 
-# Add Academic Achievement to top_topics_df
-academic_achievement_row = pd.DataFrame({
-    'Topic ID': ['Academic_Achievement'],
-    'Topic Code': ['Academic Achievement']
-})
-top_topics_df = pd.concat([top_topics_df, academic_achievement_row], ignore_index=True)
-
-# %%
-# Define topic groups in the specified order: Academic, Non-Academic, Family, Mechanisms
-TOPIC_GROUPS = [
-    ("Academic Topics", ["Topic_1", "Topic_8", "Academic_Achievement"]),
-    ("Non-Academic Outcomes", ["Topic_3", "Topic_5", "Topic_12", "Topic_14"]),
-    ("Family and Community", ["Topic_17", "Topic_20"]),
-    ("Mechanisms", ["Topic_0", "Topic_22"])
-]
-
-# Flatten topic list in the desired order
-ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
+ordered_topics = [topic for _, topics in TOPIC_GROUPS for topic in topics]
 
 # %%
 # Create results workbook

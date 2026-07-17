@@ -80,7 +80,7 @@ word_cols = [f'Word {i+1}' for i in range(10)]
 available_word_cols = [col for col in word_cols if col in table_df.columns]
 
 columns_to_include = [
-    'topic_id', 'code', 'parent_code',
+    'topic_id', 'code', 'parent_code', 'group_order',
     'avg_prevalence', 'p25_prevalence', 'p75_prevalence'
 ] + available_word_cols
 
@@ -90,6 +90,7 @@ rename_dict = {
     'topic_id': 'Topic ID',
     'code': 'Topic Code',
     'parent_code': 'Parent Code',
+    'group_order': 'Group Order',
     'avg_prevalence': 'Average Prevalence',
     'p25_prevalence': '25th Percentile',
     'p75_prevalence': '75th Percentile'

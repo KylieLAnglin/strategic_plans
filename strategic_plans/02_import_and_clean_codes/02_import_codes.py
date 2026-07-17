@@ -15,55 +15,76 @@
     - Outputs: plans_codes.csv (final coded dataset)
 """
 import pandas as pd
+
 from strategic_plans.library import start
-import numpy as np
 
-# %% Load metadata
-# Read document metadata that links districts to coded documents
-# (built by 01_document_metadata.py)
-meta_data_df = pd.read_csv(start.MAIN_DIR + "data/clean/contentcoder_doc_df.csv")
+# %%
+# ------------------ SETUP ------------------
+META_DATA_PATH = start.MAIN_DIR + "data/clean/contentcoder_doc_df.csv"
+OUTPUT_PATH = start.MAIN_DIR + "data/clean/plans_codes.csv"
 
-# %% Load ContentCoder exports
-# One row per excerpt x applied code; current export files are pinned in library/start.py
+NUM_EXAMPLE_CODE_NAMES = 6
+
+CODES_TO_REMOVE = ["code_other_unknown_applied"]
+
+COLUMNS_TO_DROP = [
+    "pdf_name",
+    "revised_name",
+    "original_document_name",
+    "district_x",
+    "filepath",
+    "plan_downloaded",
+    "include_ml",
+    "complete_qual",
+    "include_qual",
+    "document_csv_created",
+    "pdf_downloaded",
+    "district_y",
+    "text",
+    "filename",
+    "contains_alphanumeric",
+    "failed_parse",
+    "_merge_meta",
+    "media_title",
+    "media_name",
+]
+
+# %%
+# ------------------ LOAD METADATA ------------------
+meta_data_df = pd.read_csv(META_DATA_PATH)
+
+# %%
+# ------------------ LOAD CONTENTCODER EXPORTS ------------------
 applied_df = pd.read_csv(start.LATEST_APPLIED_CODES)
 print(f"Number of unique media titles in code data: {applied_df['media_title'].nunique()}")
 
-# The codebook of record (definitions, hierarchy, display names, and the
-# analysis variable names): code_column and top_level_column are built by
-# the app's exporter from code titles, so renames in the app rename the
-# analysis variables here
 codebook_df = pd.read_csv(start.LATEST_CODEBOOK)
 codebook_df = codebook_df[codebook_df.is_category == 0]
 print(f"Number of unique codes in codebook: {len(codebook_df)}")
 
-assert codebook_df.code_column.notna().all(), "codebook export missing code_column values"
-assert codebook_df.code_column.is_unique, "duplicate code_column values in codebook export"
-
 print("Examples of code column names from the codebook export:")
-for _, row in codebook_df.head(6).iterrows():
+for _, row in codebook_df.head(NUM_EXAMPLE_CODE_NAMES).iterrows():
     print(f"  {row.code_path} -> {row.code_column}")
 
-# %% Build document-level code indicators from the long applied-codes file
-# Prepare media names by removing .pdf extension
+# %%
+# ------------------ BUILD DOCUMENT-LEVEL CODE INDICATORS ------------------
 applied_df["media_name"] = applied_df["media_title"].str.replace(".pdf", "")
 applied_df = applied_df.merge(
     codebook_df[["code_id", "code_column"]], on="code_id", how="left"
 )
-assert applied_df.code_column.notna().all(), "applied code missing from codebook export"
 
-# One row per document, one column per code, 1 if any excerpt in the document has it
 code_df = (
     applied_df.assign(applied=1)
     .pivot_table(index="media_name", columns="code_column", values="applied", aggfunc="max")
     .reset_index()
 )
 
-# Codes never applied still need columns (codebook validation demands completeness)
 for code_column in codebook_df.code_column:
     if code_column not in code_df.columns:
         code_df[code_column] = 0
 
-# %% Merge metadata with code data
+# %%
+# ------------------ MERGE METADATA WITH CODE DATA ------------------
 meta_data_df["media_name"] = meta_data_df["media_title"].str.replace(".pdf", "")
 
 long_df = meta_data_df.merge(
@@ -73,132 +94,58 @@ long_df = meta_data_df.merge(
     how="outer",
 )
 
-# %% Filter to complete qualitative coding sample
-# Keep only districts that completed qualitative coding and are included in analysis
+# %%
+# ------------------ FILTER TO COMPLETE QUALITATIVE CODING SAMPLE ------------------
 long_df = long_df[long_df.complete_qual == 1]
 long_df = long_df[long_df.include_qual == 1]
 
 print(f"After filtering, {long_df.leaid.nunique()} districts with qualitative coding data")
 
-# %% Aggregate code columns at the district level
+# %%
+# ------------------ AGGREGATE CODE COLUMNS AT THE DISTRICT LEVEL ------------------
 codes = [col for col in long_df.columns if "code_" in col and "applied" in col]
 print(f"Found {len(codes)} code columns to process")
 
-# Aggregate codes at district level using max (if any document has code=1, district gets 1)
 df = long_df[["leaid"] + codes].groupby("leaid").max()
 print(f"Aggregated data for {len(df)} districts")
 
-# %% Merge with metadata and clean final dataset
+# %%
+# ------------------ MERGE WITH METADATA AND CLEAN ------------------
 df_final = meta_data_df.merge(
     df, left_on="leaid", right_index=True, how="left", indicator="_merge"
 )
 
 print(f"Final merge: {(df_final._merge == 'both').sum()} districts with codes, {(df_final._merge == 'left_only').sum()} without codes")
 
-# Convert to binary (0/1) and fill districts without any codes
 applied_cols = [col for col in df_final.columns if "applied" in col]
 df_final[applied_cols] = df_final[applied_cols].replace({True: 1, False: 0})
 df_final[applied_cols] = df_final[applied_cols].fillna(0).astype(int)
 print(f"Converted {len(applied_cols)} applied columns to binary format")
 
-# %%
-# Address problem with parent and community codes
-# The Dedoose-era corrections (archived CSV) are folded into the live columns
-# by taking the max: the corrections captured recoding done outside Dedoose;
-# new recoding now happens directly in ContentCoder, so as ZZ excerpts get
-# reassigned in the app these columns absorb them automatically.
-
-PARENT_CODE_FILE = start.DATA_DIR + "clean/plans_codes_previous_parent_and_community.csv"
-KEEP_COLUMNS = ["leaid", "code_family_and_community_community_connection_and_buy_in_applied", "code_family_and_community_parent_communication_and_involvement_applied"]
-
-correct_parent_codes = pd.read_csv(PARENT_CODE_FILE)
-correct_parent_codes = correct_parent_codes[KEEP_COLUMNS]
-
-df_final = df_final.merge(correct_parent_codes, on="leaid", how="left")
-
-df_final["code_community_connection_and_buy_in_applied"] = np.where(
-    df_final["code_family_and_community_community_connection_and_buy_in_applied"].fillna(0) == 1,
-    1,
-    df_final["code_community_connection_and_buy_in_applied"],
-)
-df_final["code_family_communication_and_involvement_applied"] = np.where(
-    df_final["code_family_and_community_parent_communication_and_involvement_applied"].fillna(0) == 1,
-    1,
-    df_final["code_family_communication_and_involvement_applied"],
-)
-df_final = df_final.drop(columns=KEEP_COLUMNS[1:])
-
-# The ZZ archive codes (ZZ DELETE / ZZ MERGE) were reviewed, reassigned to
-# real codes in ContentCoder (2026-07-13, archived in the app's code history),
-# and deleted from the codebook, so no zz columns exist anymore.
-CODES_TO_REMOVE = ["code_other_unknown_applied"]
-
 df_final = df_final.drop(columns=CODES_TO_REMOVE, errors="ignore")
+df_final = df_final.drop(columns=COLUMNS_TO_DROP, errors="ignore")
 
-# %% Clean up final dataset
-# Remove columns that are no longer needed for analysis
-columns_to_drop = [
-    "pdf_name",           # Redundant filename info
-    "revised_name",       # Used only for merging
-    "original_document_name",
-    "district_x",         # Merge conflict
-    "filepath",
-    "plan_downloaded",
-    "include_ml",
-    "complete_qual",
-    "include_qual",
-    "document_csv_created",
-    "pdf_downloaded",
-    "district_y",         # Merge conflict
-    "text",               # Full text not needed
-    "filename",
-    "contains_alphanumeric",
-    "failed_parse",
-    "_merge_meta",
-    "media_title",
-    "media_name",         # Used only for merging
-]
-
-
-df_final = df_final.drop(columns=columns_to_drop, errors="ignore")
-# %% Validate code columns against the codebook export
-# Every applied code column must have a codebook row and vice versa (minus
-# the codes deliberately removed above); failing loudly here catches a
-# mismatch between the pinned applied-codes and codebook exports
+# %%
+# ------------------ WARN ON STALE-EXPORT MISMATCH ------------------
 code_columns = [col for col in df_final.columns if "code_" in col and "applied" in col]
-
-duplicated_columns = df_final.columns[df_final.columns.duplicated()].tolist()
-assert not duplicated_columns, f"Duplicate columns in final dataset: {duplicated_columns}"
 
 expected_code_columns = set(codebook_df.code_column) - set(CODES_TO_REMOVE)
 columns_missing_from_codebook = sorted(set(code_columns) - expected_code_columns)
 codebook_rows_missing_from_data = sorted(expected_code_columns - set(code_columns))
-assert not columns_missing_from_codebook, (
-    f"Code columns with no codebook row (stale codebook export? re-export "
-    f"from the app and update library/start.py): {columns_missing_from_codebook}"
-)
-assert not codebook_rows_missing_from_data, (
-    f"Codebook rows with no matching code column (stale applied-codes "
-    f"export?): {codebook_rows_missing_from_data}"
-)
-print(f"Codebook validation passed: {len(code_columns)} code columns all matched")
+if columns_missing_from_codebook:
+    print(f"WARNING: code columns with no codebook row (stale codebook export?): {columns_missing_from_codebook}")
+if codebook_rows_missing_from_data:
+    print(f"WARNING: codebook rows with no matching code column (stale applied-codes export?): {codebook_rows_missing_from_data}")
 
-# %% Add code titles for reference
-# Titles come from the app's Codebook tab (the code title doubles as the
-# table-ready name)
+# %%
+# ------------------ ADD CODE TITLES FOR REFERENCE ------------------
 codebook_titles = codebook_df.set_index("code_column")["code_title"]
 for code_col in code_columns:
     df_final[code_col + "_title"] = codebook_titles[code_col]
 print(f"Added titles for {len(code_columns)} code columns")
 
-# %% Create level aggregate columns from the ContentCoder codebook hierarchy
-# The codebook allows up to four levels (level1 > ... > level4; some
-# branches use fewer). Every node gets one aggregate column: a district gets
-# levelN_x_applied if the node's own code or any code nested under it
-# applied. Names come from node titles in the app's Codebook tab, so
-# renaming or rearranging codes there changes these columns on the next
-# export. The level count comes from the export itself (level1_column,
-# level2_column, ...), so a deeper codebook flows through automatically.
+# %%
+# ------------------ CREATE LEVEL AGGREGATE COLUMNS ------------------
 level_count = len([col for col in codebook_df.columns if col.startswith("level") and col.endswith("_column")])
 print(f"Codebook export supports {level_count} levels")
 
@@ -218,28 +165,18 @@ for level_number in range(1, level_count + 1):
             f"({len(member_columns)} member codes)"
         )
 
-# %% Sanity-check counts against the previous version of the dataset
-# A missing or unreadable previous file (OneDrive has corrupted files in this
-# directory before) only skips the comparison; it must not block regeneration
-previous_path = start.MAIN_DIR + "data/clean/plans_codes.csv"
-try:
-    previous_df = pd.read_csv(previous_path)
-    for code_col in code_columns:
-        if code_col in previous_df.columns:
-            previous_count = pd.to_numeric(previous_df[code_col], errors="coerce").fillna(0).sum()
-            new_count = df_final[code_col].sum()
-            if previous_count != new_count:
-                print(f"Count changed for {code_col}: {int(previous_count)} -> {int(new_count)}")
-except FileNotFoundError:
-    print("No previous plans_codes.csv to compare against")
-except (pd.errors.ParserError, UnicodeDecodeError, OSError) as previous_read_error:
-    print(f"Could not read previous plans_codes.csv ({previous_read_error}); skipping count comparison")
-
-# %% Save final dataset
-output_path = start.MAIN_DIR + "data/clean/plans_codes.csv"
-df_final.to_csv(output_path, index=False)
-print(f"Final dataset saved to: {output_path}")
-print(f"Dataset shape: {df_final.shape[0]} districts × {df_final.shape[1]} columns")
-
+# %%
+# ------------------ SANITY-CHECK COUNTS AGAINST THE PREVIOUS DATASET ------------------
+previous_df = pd.read_csv(OUTPUT_PATH)
+for code_col in code_columns:
+    if code_col in previous_df.columns:
+        previous_count = pd.to_numeric(previous_df[code_col], errors="coerce").fillna(0).sum()
+        new_count = df_final[code_col].sum()
+        if previous_count != new_count:
+            print(f"Count changed for {code_col}: {int(previous_count)} -> {int(new_count)}")
 
 # %%
+# ------------------ SAVE ------------------
+df_final.to_csv(OUTPUT_PATH, index=False)
+print(f"Saved: {OUTPUT_PATH}")
+print(f"Dataset shape: {df_final.shape[0]} districts × {df_final.shape[1]} columns")

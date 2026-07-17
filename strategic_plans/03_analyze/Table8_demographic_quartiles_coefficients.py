@@ -42,33 +42,19 @@ for q in ['Q1', 'Q2', 'Q3', 'Q4']:
     print(f"{q}: {s['min']:.1f}% - {s['max']:.1f}% (mean: {s['mean']:.1f}%, n={int(s['count'])})")
 
 # ---------------- Topic sets ----------------
-if NORMALIZED:
-    merge_df['Academic_Achievement_norm'] = merge_df['Topic_9_norm'] + merge_df['Topic_16_norm']
-    # add label row with ID w/o _norm so topic_label() resolves properly
-    top_topics_df = pd.concat([
-        top_topics_df,
-        pd.DataFrame({'Topic ID': ['Academic_Achievement'], 'Topic Code': ['Academic Achievement']})
-    ], ignore_index=True)
-    TOPIC_GROUPS = [
-        ("Academic Topics", ["Topic_1_norm", "Topic_8_norm", "Academic_Achievement_norm"]),
-        ("Non-Academic Outcomes", ["Topic_3_norm", "Topic_5_norm", "Topic_12_norm", "Topic_14_norm"]),
-        ("Family and Community", ["Topic_17_norm", "Topic_20_norm"]),
-        ("Mechanisms", ["Topic_0_norm", "Topic_22_norm"])
-    ]
-else:
-    merge_df['Academic_Achievement'] = merge_df['Topic_9'] + merge_df['Topic_16']
-    top_topics_df = pd.concat([
-        top_topics_df,
-        pd.DataFrame({'Topic ID': ['Academic_Achievement'], 'Topic Code': ['Academic Achievement']})
-    ], ignore_index=True)
-    TOPIC_GROUPS = [
-        ("Academic Topics", ["Topic_1", "Topic_8", "Academic_Achievement"]),
-        ("Non-Academic Outcomes", ["Topic_3", "Topic_5", "Topic_12", "Topic_14"]),
-        ("Family and Community", ["Topic_17", "Topic_20"]),
-        ("Mechanisms", ["Topic_0", "Topic_22"])
-    ]
+# Grouping, names, inclusion, and merges are all chosen in the ContentCoder app
+# and flow here through top_topics.xlsx (see Table5b). Groups follow the app's
+# LDA-tab order (Group Order); topics within a group are ordered by prevalence.
+suffix = "_norm" if NORMALIZED else ""
+top_topics_df = top_topics_df.sort_values(
+    ["Group Order", "Average Prevalence"], ascending=[True, False]
+)
+TOPIC_GROUPS = []
+for group_name, group_rows in top_topics_df.groupby("Parent Code", sort=False):
+    members = [f"{topic_id}{suffix}" for topic_id in group_rows["Topic ID"]]
+    TOPIC_GROUPS.append((group_name, members))
 
-ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
+ordered_topics = [topic for _, topics in TOPIC_GROUPS for topic in topics]
 quartile_levels = ["Q2", "Q3", "Q4"]  # Q1 is reference
 
 # ---------------- Workbook ----------------

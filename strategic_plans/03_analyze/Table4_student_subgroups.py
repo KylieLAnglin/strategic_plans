@@ -46,46 +46,6 @@ subgroup_count["all_districts_rank"] = subgroup_count.count_plans.rank(
 )
 
 # %%
-# Address problem with parent and community codes (same as in 02_import_codes.py)
-
-PARENT_CODE_FILE = start.DATA_DIR + "clean/plans_codes_previous_parent_and_community.csv"
-correct_parent_codes = pd.read_csv(PARENT_CODE_FILE)
-
-KEEP_COLUMNS = ["leaid", "code_family_and_community_community_connection_and_buy_in_applied", "code_family_and_community_parent_communication_and_involvement_applied"]
-
-# Check if any of the parent/community codes are in our subgroup analysis
-parent_community_subgroup_codes = [col for col in subgroup_codes if any(keep_col.replace("leaid", "").strip(", ") in col for keep_col in KEEP_COLUMNS[1:])]
-if parent_community_subgroup_codes:
-    print(f"Found parent/community codes in subgroup analysis: {parent_community_subgroup_codes}")
-    
-    # Apply the same corrections as in 02_import_codes.py
-    df_with_corrections = df.merge(correct_parent_codes[KEEP_COLUMNS], on="leaid", how="left")
-    
-    # Update any affected subgroup codes
-    for orig_col in parent_community_subgroup_codes:
-        if "community_connection_and_buy_in" in orig_col:
-            correct_col = "code_family_and_community_community_connection_and_buy_in_applied"
-            if correct_col in df_with_corrections.columns:
-                df[orig_col] = df_with_corrections[correct_col].fillna(0)
-        elif "family_communication_and_involvement" in orig_col:
-            correct_col = "code_family_and_community_parent_communication_and_involvement_applied"
-            if correct_col in df_with_corrections.columns:
-                df[orig_col] = df_with_corrections[correct_col].fillna(0)
-    
-    # Recalculate subgroup counts with corrected data
-    subgroup_count = pd.DataFrame(df[subgroup_codes].sum()).reset_index()
-    subgroup_count = subgroup_count.rename(columns={"index": "subgroup", 0: "count_plans"})
-    subgroup_count["count_plans"] = pd.to_numeric(subgroup_count["count_plans"], errors='coerce')
-    subgroup_count = subgroup_count.sort_values(by="count_plans", ascending=False)
-    subgroup_count = subgroup_count.set_index("subgroup")
-    
-    number_plans = df.leaid.nunique()
-    subgroup_count["proportion"] = subgroup_count.count_plans / number_plans
-    subgroup_count["all_districts_rank"] = subgroup_count.count_plans.rank(ascending=False, method="min")
-    
-    print("Recalculated subgroup counts with parent/community code corrections")
-
-# %%
 # Map titles and descriptions from the codebook export. A subgroup column is
 # either a per-code column (code_column) or a node's aggregate column (the
 # levelN_column at its own depth), both named by the export itself.

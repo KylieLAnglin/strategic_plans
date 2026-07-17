@@ -11,8 +11,9 @@ top_topics_df = pd.read_excel(start.RESULTS_DIR + 'top_topics.xlsx')
 merge_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_and_codes.xlsx")
 merge_df = merge_df[merge_df.state != "PA"]  # Exclude PA for now
 
-# Create combined Academic Achievement topic (Topic_9 + Topic_16)
-merge_df['Academic_Achievement'] = merge_df['Topic_9'] + merge_df['Topic_16']
+# Topic 16 is merged into Topic_9 upstream (app LDA tab), so Topic_9 already
+# carries the combined prevalence; this line only adds the table's label
+merge_df['Academic_Achievement'] = merge_df['Topic_9']
 
 # Add Academic Achievement to top_topics_df if not present
 if not (top_topics_df['Topic ID'] == 'Academic_Achievement').any():

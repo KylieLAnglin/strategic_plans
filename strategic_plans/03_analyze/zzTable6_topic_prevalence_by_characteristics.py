@@ -38,8 +38,9 @@ merge_df["enrollment_in_thousands"] = merge_df["enrollment_in_thousands"] / 1000
 
 
 # %%
-# Create combined Academic Achievement topic (Topic_9 + Topic_16)
-merge_df['Academic_Achievement'] = merge_df['Topic_9'] + merge_df['Topic_16']
+# Topic 16 is merged into Topic_9 upstream (app LDA tab), so Topic_9 already
+# carries the combined prevalence; this line only adds the table's label
+merge_df['Academic_Achievement'] = merge_df['Topic_9']
 
 # Add Academic Achievement to top_topics_df
 academic_achievement_row = pd.DataFrame({

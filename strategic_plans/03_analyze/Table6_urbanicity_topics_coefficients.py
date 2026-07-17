@@ -22,30 +22,19 @@ top_topics_df = pd.read_excel(start.RESULTS_DIR + 'top_topics.xlsx')
 merge_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_and_codes.xlsx")
 merge_df = merge_df[merge_df.state != "PA"]
 
-if NORMALIZED:
-    merge_df['Academic_Achievement'] = merge_df['Topic_9_norm'] + merge_df['Topic_16_norm']
-    TOPIC_GROUPS = [
-        ("Academic Topics", ["Topic_1_norm", "Topic_8_norm", "Academic_Achievement"]),
-        ("Non-Academic Outcomes", ["Topic_3_norm", "Topic_5_norm", "Topic_12_norm", "Topic_14_norm"]),
-        ("Family and Community", ["Topic_17_norm", "Topic_20_norm"]),
-        ("Mechanisms", ["Topic_0_norm", "Topic_22_norm"])
-    ]
-else:
-    merge_df['Academic_Achievement'] = merge_df['Topic_9'] + merge_df['Topic_16']
-    TOPIC_GROUPS = [
-        ("Academic Topics", ["Topic_1", "Topic_8", "Academic_Achievement"]),
-        ("Non-Academic Outcomes", ["Topic_3", "Topic_5", "Topic_12", "Topic_14"]),
-        ("Family and Community", ["Topic_17", "Topic_20"]),
-        ("Mechanisms", ["Topic_0", "Topic_22"])
-    ]
+# Grouping, names, inclusion, and merges are all chosen in the ContentCoder app
+# and flow here through top_topics.xlsx (see Table5b). Groups follow the app's
+# LDA-tab order (Group Order); topics within a group are ordered by prevalence.
+suffix = "_norm" if NORMALIZED else ""
+top_topics_df = top_topics_df.sort_values(
+    ["Group Order", "Average Prevalence"], ascending=[True, False]
+)
+TOPIC_GROUPS = []
+for group_name, group_rows in top_topics_df.groupby("Parent Code", sort=False):
+    members = [f"{topic_id}{suffix}" for topic_id in group_rows["Topic ID"]]
+    TOPIC_GROUPS.append((group_name, members))
 
-# Add label for Academic_Achievement
-top_topics_df = pd.concat([
-    top_topics_df,
-    pd.DataFrame({'Topic ID': ['Academic_Achievement'], 'Topic Code': ['Academic Achievement']})
-], ignore_index=True)
-
-ordered_topics = [t for _, topics in TOPIC_GROUPS for t in topics]
+ordered_topics = [topic for _, topics in TOPIC_GROUPS for topic in topics]
 
 # ---------------- Workbook ----------------
 wb = Workbook()

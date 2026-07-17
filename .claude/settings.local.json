@@ -19,7 +19,13 @@
       "Bash(break)",
       "Bash(/opt/anaconda3/envs/strategic_plans/bin/python -c ' *)",
       "Bash(pwd -P)",
-      "Bash(/opt/anaconda3/envs/strategic_plans/bin/python *)"
+      "Bash(/opt/anaconda3/envs/strategic_plans/bin/python *)",
+      "Bash(curl -s -m 5 -X POST localhost:5000/api/export -H 'Content-Type: application/json' -d '{\"kind\":\"topics\"}')",
+      "Bash(echo \"---exit $?\")",
+      "Bash(lsof -nP -iTCP -sTCP:LISTEN)",
+      "Bash(curl -s -m 120 -X POST localhost:8321/api/export -H 'Content-Type: application/json' -d '{\"kind\":\"topics\"}')",
+      "Read(//Users/kylie.anglin/Library/CloudStorage/**)",
+      "Read(//Users/kylie.anglin/Library/CloudStorage/OneDrive-UniversityofConnecticut/**)"
     ],
     "deny": []
   }
