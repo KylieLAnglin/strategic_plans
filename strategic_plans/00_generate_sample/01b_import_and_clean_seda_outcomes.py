@@ -1,29 +1,38 @@
 # %%
 import pandas as pd
-import random
 
 from strategic_plans.library import start
 
-# %%
+# ------------------ SETUP ------------------
 
-RAW_SEDA = start.NATIONAL_DIR + "raw_from_SEDA/"
-RAW_CCD = start.NATIONAL_DIR + "raw_from_CCD/"
-
+RAW_SEDA_DIR = start.NATIONAL_DIR + "raw_from_SEDA/"
+RAW_CCD_DIR = start.NATIONAL_DIR + "raw_from_CCD/"
 CLEAN_DIR = start.MAIN_DIR + "data/clean/"
-codebook = pd.read_excel(start.MAIN_DIR + "data/seda_codebook.xlsx")
+
+CODEBOOK_PATH = start.MAIN_DIR + "data/seda_codebook.xlsx"
+EXPORT_OUTCOMES_PATH = start.DATA_DIR + "clean/2018_seda_outcomes.csv"
+
+ANALYSIS_YEAR = 2018
+
+# %%
+# ------------------ LOAD DATA ------------------
+
+codebook = pd.read_excel(CODEBOOK_PATH)
 codebook = codebook[~codebook.seda4_1_outcomes.isnull()]
 rename_dict = dict(zip(codebook["seda4_1_outcomes"], codebook["new_name"]))
+
 # %%
-seda = pd.read_csv(RAW_SEDA + "seda_geodist_long_cs_4.1.csv")
+seda = pd.read_csv(RAW_SEDA_DIR + "seda_geodist_long_cs_4.1.csv")
 seda = seda.rename(columns=rename_dict)
 seda = seda[list(rename_dict.values())]
 seda.sample()
 
-
 # %%
 outcomes = [col for col in seda.columns if "mean" in col]
 
-# %% Average across grades
+# %%
+# ------------------ AVERAGE ACROSS GRADES ------------------
+
 seda_subject_year = (
     seda[
         [
@@ -39,6 +48,7 @@ seda_subject_year = (
 ).reset_index()
 
 # %%
+# ------------------ SPLIT READING AND MATH ------------------
 
 df_reading = seda_subject_year[seda_subject_year.test_subject == "rla"]
 rla_columns = [col.replace("_subject", "_rla") for col in outcomes]
@@ -54,8 +64,8 @@ df_math = df_math.drop(outcomes, axis=1)
 df_math = df_math[["district_id", "year"] + math_columns]
 df_math.sample()
 
-
 # %%
+# ------------------ MERGE SUBJECTS AND GENERATE GAPS ------------------
 
 df = df_math.merge(
     df_reading,
@@ -64,14 +74,17 @@ df = df_math.merge(
     how="left",
 )
 
-
 df["test_math_wbgap_mean"] = df.test_math_white_mean - df.test_math_black_mean
 df["test_rla_wbgap_mean"] = df.test_rla_white_mean - df.test_rla_black_mean
 
-df = df[df.year == 2018]
+df = df[df.year == ANALYSIS_YEAR]
 df = df.rename(columns={"district_id": "leaid"})
+
 # %%
+# ------------------ EXPORT ------------------
 
-df.to_csv(start.DATA_DIR + "clean/2018_seda_outcomes.csv", index=False)
+df.to_csv(EXPORT_OUTCOMES_PATH, index=False)
 
-# %% Wide
+print(f"Saved: {EXPORT_OUTCOMES_PATH}")
+
+# %%

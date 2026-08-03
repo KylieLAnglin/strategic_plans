@@ -7,9 +7,9 @@
     - Prevalence uses each node's level aggregate column from
       plans_codes.csv (the node's own code or anything nested under it)
     - Excludes the Student Subgroups family
-    - Outputs: results/hierarchical_prevalence.xlsx (APA-formatted sheets
-      'Table 1' = goals for students and 'Table 2' = goals for the district
-      and community, each with an indented stub column; sheet 'data' is raw)
+    - Outputs: results/hierarchical_prevalence.xlsx (APA-formatted sheet
+      'Table 1' with every node in one table and an indented stub column;
+      sheet 'data' is raw)
 """
 import numpy as np
 import pandas as pd
@@ -84,99 +84,68 @@ hierarchical_table["count_plans"] = table_codebook.count_plans.astype(int)
 hierarchical_table["proportion"] = table_codebook.proportion
 hierarchical_table["variable"] = table_codebook.node_column
 
-# %% Build the APA-formatted sheets
-# Table 1: goals for students (the Students subtree, with its level-2
-# branches flush left). Table 2: goals for the district and community (all
-# other level-1 branches). APA table style: three horizontal rules only
-# (above and below the header row, below the last body row), no vertical
-# lines, indented stub column for the hierarchy, proportions without a
-# leading zero
+# %% Build the APA-formatted sheet
+# One table with every node, level-1 branches flush left. APA table style:
+# three horizontal rules only (above and below the header row, below the
+# last body row), no vertical lines, indented stub column for the
+# hierarchy, proportions without a leading zero
 apa_base_font = Font(name="Times New Roman", size=12)
 apa_italic_font = Font(name="Times New Roman", size=12, italic=True)
 apa_bold_font = Font(name="Times New Roman", size=12, bold=True)
 rule_below = Border(bottom=Side(style="thin"))
 rule_above_and_below = Border(top=Side(style="thin"), bottom=Side(style="thin"))
 
-students_count = int(
-    table_codebook.loc[table_codebook.code_title == "Students", "count_plans"].iloc[0]
-)
-students_codebook = table_codebook[
-    (table_codebook.level1_title == "Students") & (table_codebook.level > 1)
-]
-district_codebook = table_codebook[table_codebook.level1_title != "Students"]
-
-prevalence_note = (
+table_note = (
     f"Note. N = {number_plans} district strategic plans. Prevalence for a "
     "higher-level goal reflects plans in which that goal or any goal nested "
-    "under it was applied."
+    "under it was applied. Student subgroup codes are excluded."
 )
-table_specs = [
-    (
-        "Table 1",
-        "Prevalence of Goals for Students in District Strategic Plans",
-        students_codebook,
-        2,  # level-2 branches sit flush left
-        prevalence_note
-        + f" {students_count} of {number_plans} plans included at least one "
-        "goal for students. Student subgroup codes are excluded.",
-    ),
-    (
-        "Table 2",
-        "Prevalence of Goals for the District and Community in District Strategic Plans",
-        district_codebook,
-        1,
-        prevalence_note,
-    ),
-]
 
 workbook = Workbook()
 workbook.remove(workbook.active)
 
-for sheet_name, table_title, sheet_codebook, flush_level, table_note in table_specs:
-    apa_sheet = workbook.create_sheet(sheet_name)
-    apa_sheet["A1"] = sheet_name
-    apa_sheet["A1"].font = apa_bold_font
-    apa_sheet["A2"] = table_title
-    apa_sheet["A2"].font = apa_italic_font
+apa_sheet = workbook.create_sheet("Table 1")
+apa_sheet["A1"] = "Table 1"
+apa_sheet["A1"].font = apa_bold_font
+apa_sheet["A2"] = "Prevalence of Goals in District Strategic Plans"
+apa_sheet["A2"].font = apa_italic_font
 
-    header_row = 4
-    apa_sheet.cell(row=header_row, column=1, value="Goal")
-    apa_sheet.cell(row=header_row, column=2, value="n")
-    apa_sheet.cell(row=header_row, column=3, value="Proportion")
-    for column_number in [1, 2, 3]:
-        header_cell = apa_sheet.cell(row=header_row, column=column_number)
-        header_cell.font = apa_italic_font if column_number == 2 else apa_base_font
-        header_cell.border = rule_above_and_below
-        header_cell.alignment = Alignment(horizontal="left" if column_number == 1 else "center")
+header_row = 4
+apa_sheet.cell(row=header_row, column=1, value="Goal")
+apa_sheet.cell(row=header_row, column=2, value="n")
+apa_sheet.cell(row=header_row, column=3, value="Proportion")
+for column_number in [1, 2, 3]:
+    header_cell = apa_sheet.cell(row=header_row, column=column_number)
+    header_cell.font = apa_italic_font if column_number == 2 else apa_base_font
+    header_cell.border = rule_above_and_below
+    header_cell.alignment = Alignment(horizontal="left" if column_number == 1 else "center")
 
-    body_start_row = header_row + 1
-    for row_offset, (_, node_row) in enumerate(sheet_codebook.iterrows()):
-        excel_row = body_start_row + row_offset
-        name_cell = apa_sheet.cell(row=excel_row, column=1, value=node_row.code_title)
-        name_cell.font = apa_base_font
-        name_cell.alignment = Alignment(
-            horizontal="left", indent=int(node_row.level) - flush_level
-        )
-        count_cell = apa_sheet.cell(row=excel_row, column=2, value=int(node_row.count_plans))
-        count_cell.font = apa_base_font
-        count_cell.alignment = Alignment(horizontal="center")
-        proportion_cell = apa_sheet.cell(row=excel_row, column=3, value=float(node_row.proportion))
-        proportion_cell.font = apa_base_font
-        proportion_cell.alignment = Alignment(horizontal="center")
-        proportion_cell.number_format = "#.00"  # APA: no leading zero on proportions
+body_start_row = header_row + 1
+for row_offset, (_, node_row) in enumerate(table_codebook.iterrows()):
+    excel_row = body_start_row + row_offset
+    name_cell = apa_sheet.cell(row=excel_row, column=1, value=node_row.code_title)
+    name_cell.font = apa_base_font
+    name_cell.alignment = Alignment(horizontal="left", indent=int(node_row.level) - 1)
+    count_cell = apa_sheet.cell(row=excel_row, column=2, value=int(node_row.count_plans))
+    count_cell.font = apa_base_font
+    count_cell.alignment = Alignment(horizontal="center")
+    proportion_cell = apa_sheet.cell(row=excel_row, column=3, value=float(node_row.proportion))
+    proportion_cell.font = apa_base_font
+    proportion_cell.alignment = Alignment(horizontal="center")
+    proportion_cell.number_format = "#.00"  # APA: no leading zero on proportions
 
-    last_body_row = body_start_row + len(sheet_codebook) - 1
-    for column_number in [1, 2, 3]:
-        apa_sheet.cell(row=last_body_row, column=column_number).border = rule_below
+last_body_row = body_start_row + len(table_codebook) - 1
+for column_number in [1, 2, 3]:
+    apa_sheet.cell(row=last_body_row, column=column_number).border = rule_below
 
-    note_cell = apa_sheet.cell(row=last_body_row + 2, column=1)
-    note_cell.value = table_note
-    note_cell.font = apa_base_font
-    note_cell.alignment = Alignment(horizontal="left", wrap_text=True)
+note_cell = apa_sheet.cell(row=last_body_row + 2, column=1)
+note_cell.value = table_note
+note_cell.font = apa_base_font
+note_cell.alignment = Alignment(horizontal="left", wrap_text=True)
 
-    apa_sheet.column_dimensions["A"].width = 58
-    apa_sheet.column_dimensions["B"].width = 8
-    apa_sheet.column_dimensions["C"].width = 12
+apa_sheet.column_dimensions["A"].width = 58
+apa_sheet.column_dimensions["B"].width = 8
+apa_sheet.column_dimensions["C"].width = 12
 
 # %% Export (APA sheet plus a raw data sheet)
 data_sheet = workbook.create_sheet("data")

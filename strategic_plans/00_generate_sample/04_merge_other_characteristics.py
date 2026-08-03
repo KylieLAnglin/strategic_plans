@@ -1,67 +1,72 @@
 # %%
-import os
 import numpy as np
 import pandas as pd
-import string
-import re
-import random
-from tqdm import tqdm
 
 from strategic_plans.library import start
 
+# ------------------ SETUP ------------------
+
+SAMPLE_PATH = start.DATA_DIR + "clean/stratified_sample.csv"
+VOTESHARE_PATH = start.DATA_DIR + "clean/district_vote_share.dta"
+CCD_PATH = start.DATA_DIR + "clean/district_demo_ach_file_v3.dta"
+
+EXPORT_CHARACTERISTICS_PATH = (
+    start.DATA_DIR + "clean/stratified_sample_characteristics.csv"
+)
+
 # %%
-# need state, district, and leaid
-sample_df = pd.read_csv(start.DATA_DIR + "clean/stratified_sample.csv")
+# ------------------ LOAD DATA ------------------
+
+sample_df = pd.read_csv(SAMPLE_PATH)
 sample_df["state"] = sample_df.state.apply(lambda x: x.upper())
 sample_df["district"] = sample_df.lea_name.apply(lambda x: x.upper())
 sample_df = sample_df.drop_duplicates(subset=["state", "district"], keep="first")
 sample_df = sample_df[["leaid", "state", "district"]]
-# %%
 
-voteshare_df = pd.read_stata(start.DATA_DIR + "clean/district_vote_share.dta"
-)
-
-ccd_df = pd.read_stata(
-    start.DATA_DIR
-    + "clean/district_demo_ach_file_v3.dta"
-)
-# ccd_df = ccd_df[["leaid", "fips_geo", "urban", "suburb", "town", "rural"]]
 # %%
+voteshare_df = pd.read_stata(VOTESHARE_PATH)
+ccd_df = pd.read_stata(CCD_PATH)
+
+# %%
+# ------------------ MERGE SAMPLE AND CCD ------------------
+
 df = sample_df.merge(
     ccd_df, left_on="leaid", right_on="leaid", how="left", indicator="_merge_ccd"
 )
-# %% Region
-# Northeast
+
+# %%
+# ------------------ REGION ------------------
+
 df["northeast"] = df["fips_geo"].isin([9, 23, 25, 33, 44, 50, 34, 36, 42])
 
-# Midwest
 midwest_states_1 = [18, 17, 26, 39, 55, 19, 20, 27]
 midwest_states_2 = [29, 31, 38, 46]
 df["midwest"] = df["fips_geo"].isin(midwest_states_1) | df["fips_geo"].isin(
     midwest_states_2
 )
 
-# South
 south_states_1 = [10, 11, 12, 13, 24, 37, 45, 51, 54]
 south_states_2 = [1, 21, 28, 47, 5, 22, 40, 48]
 df["south"] = df["fips_geo"].isin(south_states_1) | df["fips_geo"].isin(south_states_2)
 
-# West
 west_states_1 = [4, 8, 16, 35, 30, 49]
 west_states_2 = [32, 56, 2, 6, 15, 41, 53]
 df["west"] = df["fips_geo"].isin(west_states_1) | df["fips_geo"].isin(west_states_2)
-
 
 for region in ["northeast", "midwest", "south", "west"]:
     df[region] = np.where(df[region] == True, 1, 0)
 
 # %%
+# ------------------ URBANICITY ------------------
+
 df["urbanicity"] = df[["urban", "suburb", "town", "rural"]].idxmax(axis=1)
-region_indicators = pd.get_dummies(df["urbanicity"])
+urbanicity_indicators = pd.get_dummies(df["urbanicity"])
 df = df.drop(["urban", "suburb", "town", "rural"], axis=1)
-df = pd.concat([df, region_indicators], axis=1)
+df = pd.concat([df, urbanicity_indicators], axis=1)
 
 # %%
+# ------------------ RENAME AND GENERATE CHARACTERISTICS ------------------
+
 df["enrollment_in_thousands"] = df.tot_enroll
 
 df["percent_race_white"] = df.perwht
@@ -71,7 +76,6 @@ df["percent_race_black_hispanic"] = df.perhsp + df.perblk
 df["percent_race_other"] = df.perasn + df.pernam
 
 df["percent_frl"] = df.perfrl
-
 
 df["log_income"] = df.lninc50all
 
@@ -97,8 +101,10 @@ binary_characteristics = [
     "town",
     "rural",
 ]
-for char in binary_characteristics:
-    df[char] = np.where(df[char] == True, 1, np.where(df[char] == False, 0, np.nan))
+for characteristic in binary_characteristics:
+    df[characteristic] = np.where(
+        df[characteristic] == True, 1, np.where(df[characteristic] == False, 0, np.nan)
+    )
 
 characteristics = [
     "state",
@@ -126,9 +132,9 @@ characteristics = [
 df = df.set_index("leaid")
 df = df[characteristics]
 
+# %%
+# ------------------ CREATE INDICATORS ------------------
 
-# %% Create indicators
-# Generate blue, purple, red columns
 df["blue"] = df["district_pct_trump"] < 0.45
 df["purple"] = (df["district_pct_trump"] >= 0.45) & (df["district_pct_trump"] < 0.56)
 df["red"] = df["district_pct_trump"] >= 0.56
@@ -151,5 +157,10 @@ df["urganicity"] = np.where(
 )
 
 # %%
-df.to_csv(start.DATA_DIR + "clean/stratified_sample_characteristics.csv")
+# ------------------ EXPORT ------------------
+
+df.to_csv(EXPORT_CHARACTERISTICS_PATH)
+
+print(f"Saved: {EXPORT_CHARACTERISTICS_PATH}")
+
 # %%

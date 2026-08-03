@@ -1,54 +1,50 @@
 # %%
-"""
-  - Purpose: Diagnostic for document-to-metadata matching
-  - Source: ContentCoder applied-codes export (pinned in library/start.py)
-  - Key operations:
-    - Imports plan metadata and filters to the qualitative coding sample
-  (include_qual == 1)
-    - Reads the ContentCoder applied_codes export (one row per excerpt x code)
-    - Filters to project coders
-    - Merges coded media titles against sample metadata and reports
-  left_only / right_only mismatches (in-sample-but-not-coded and
-  coded-but-not-in-sample)
-    - The SEARCH cell at the bottom looks up a district by name on both sides
-"""
 import pandas as pd
 
 from strategic_plans.library import start
 
-# %%
 # ------------------ SETUP ------------------
+
 META_DATA_PATH = start.MAIN_DIR + "data/clean/plans_meta_data_full.csv"
+APPLIED_CODES_PATH = start.LATEST_APPLIED_CODES
+
 CODERS = ["mikayla.clemens", "JuliaOas", "kylielanglin"]
 SEARCH = "HICKMAN"
 
 # %%
 # ------------------ LOAD METADATA ------------------
+
 meta_data_df = pd.read_csv(META_DATA_PATH)
 meta_data_df = meta_data_df[meta_data_df.include_qual == 1]
 
 # %%
 # ------------------ LOAD APPLIED CODES ------------------
-code_df = pd.read_csv(start.LATEST_APPLIED_CODES)
+
+code_df = pd.read_csv(APPLIED_CODES_PATH)
 code_df["media_title"].nunique()
 
 # %%
-code_df = code_df[["media_title", "date_coded", "excerpt_creator"]]
-code_df = code_df.rename(columns={"excerpt_creator": "coder"})
-code_df.sample()
+document_coder_df = code_df[["media_title", "date_coded", "excerpt_creator"]]
+document_coder_df = document_coder_df.rename(columns={"excerpt_creator": "coder"})
+document_coder_df.sample()
+
+document_coder_df["coder"] = pd.Categorical(
+    document_coder_df.coder, categories=CODERS, ordered=True
+)
+document_coder_df = document_coder_df.sort_values(by=["media_title", "coder"])
+
+document_coder_df = document_coder_df.drop_duplicates()
+document_coder_df = document_coder_df[document_coder_df.coder.isin(CODERS)]
 
 # %%
-code_df = code_df.drop_duplicates()
-code_df = code_df[code_df.coder.isin(CODERS)]
-
-# %%
-code_df = code_df[["media_title"]].drop_duplicates()
-code_df["lea"] = code_df.media_title.str.replace(".pdf", "")
+documents_df = document_coder_df[["media_title"]].drop_duplicates()
+documents_df["lea"] = documents_df.media_title.str.replace(".pdf", "")
 
 # %%
 # ------------------ MERGE AND REPORT MISMATCHES ------------------
+
 df = meta_data_df.merge(
-    code_df,
+    documents_df,
     left_on="pdf_name",
     right_on="lea",
     how="outer",
@@ -67,7 +63,8 @@ df[["media_title"]][df._merge_qual == "right_only"]
 
 # %%
 # ------------------ SEARCH A DISTRICT BY NAME ------------------
-code_df[["media_title"]][code_df.media_title.str.contains(SEARCH, case=False)]
+
+document_coder_df[["media_title"]][document_coder_df.media_title.str.contains(SEARCH, case=False)]
 
 # %%
 meta_data_df[

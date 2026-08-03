@@ -1,16 +1,24 @@
 # %%
 import pandas as pd
-import re
+
 from strategic_plans.library import start
-import numpy as np
-from openpyxl import load_workbook
+
+# ------------------ SETUP ------------------
+
+COVARIATES_PATH = start.DATA_DIR + "clean/seda_ccd_covariates_2018.csv"
+OUTCOMES_PATH = start.DATA_DIR + "clean/2018_seda_outcomes.csv"
+
+EXPORT_MERGED_PATH = start.MAIN_DIR + "data/clean/seda_ccd_full.csv"
 
 # %%
+# ------------------ LOAD DATA ------------------
 
-covars = pd.read_csv(start.DATA_DIR + "clean/seda_ccd_covariates_2018.csv")
-academics = pd.read_csv(start.DATA_DIR + "clean/2018_seda_outcomes.csv")
+covars = pd.read_csv(COVARIATES_PATH)
+academics = pd.read_csv(OUTCOMES_PATH)
 academics = academics[academics.test_math_all_mean.notnull()]
 
+# %%
+# ------------------ MERGE COVARIATES AND ACADEMICS ------------------
 
 df = covars.merge(
     academics[
@@ -24,9 +32,10 @@ df = covars.merge(
     how="left",
     indicator="_merge_academics",
 )
-# %%
 
 # %%
+# ------------------ SELECT COLUMNS AND EXPORT ------------------
+
 columns_to_keep = [
     "state",
     "leaid",
@@ -41,7 +50,6 @@ columns_to_keep = [
     "district_no_grades",
     "operational_schools",
     "state_fips",
-    # "sedaleaname",
     "perasn",
     "perblk",
     "perhsp",
@@ -53,5 +61,8 @@ columns_to_keep = [
     "test_math_all_mean",
 ]
 
-df[columns_to_keep].to_csv(start.MAIN_DIR + "data/clean/seda_ccd_full.csv", index=False)
+df[columns_to_keep].to_csv(EXPORT_MERGED_PATH, index=False)
+
+print(f"Saved: {EXPORT_MERGED_PATH}")
+
 # %%

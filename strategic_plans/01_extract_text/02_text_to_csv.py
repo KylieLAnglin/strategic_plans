@@ -1,33 +1,34 @@
 # %%
-import os
-import re
-import random
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
-import layoutparser as lp
 import string
+import pandas as pd
+from tqdm import tqdm
 
 from strategic_plans.library import start
 from strategic_plans.library import parse_pdfs
 
-PRINTABLE = set(string.printable)
+# ------------------ SETUP ------------------
 
-## pip install layoutparser # Install the base layoutparser library with
+# pip install layoutparser # Install the base layoutparser library
 # pip install "layoutparser[layoutmodels]" # Install DL layout model toolkit
 # pip install "layoutparser[ocr]" # Install OCR toolkit
 # conda install -c conda-forge poppler
+
 DOWNLOAD_PATH = start.MAIN_DIR + "downloaded_pdfs/"
 CSV_PATH = start.DATA_DIR + "raw/strategic_plan_csvs/"
+META_DATA_PATH = start.DATA_DIR + "clean/meta_data_df.csv"
+
+PRINTABLE = set(string.printable)
 
 # %%
+# ------------------ LOAD DATA ------------------
 
-meta_data_df = pd.read_csv(start.DATA_DIR + "clean/meta_data_df.csv")
+meta_data_df = pd.read_csv(META_DATA_PATH)
+
 # %%
+# ------------------ EXTRACT TEXT TO CSV ------------------
+
 docs_to_extract = meta_data_df[(meta_data_df.document_csv_created == 0)]
-
 meta_data_dict = docs_to_extract.to_dict("records")
-
 
 for document in tqdm(meta_data_dict):
     doc_df = parse_pdfs.generate_pdf_df(document["filepath"])
@@ -57,7 +58,7 @@ for document in tqdm(meta_data_dict):
         text.encode(encoding="ascii", errors="ignore").decode() for text in doc_df.text
     ]
 
-    # remove | - it serves as our separator
+    # remove | because itserves as our separator
     doc_df["text"] = [text.replace("|", " ") for text in doc_df.text]
 
     doc_df.to_csv(
@@ -66,5 +67,7 @@ for document in tqdm(meta_data_dict):
         encoding="ascii",
         index=False,
     )
+
+print(f"Saved {len(meta_data_dict)} document CSVs to: {CSV_PATH}")
 
 # %%

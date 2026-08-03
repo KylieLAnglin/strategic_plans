@@ -17,6 +17,7 @@ NATIONAL_DIR = USER_DIR + "Library/CloudStorage/Dropbox/Research/national_data/d
 CONTENTCODER_EXPORT_DIR = DATA_DIR + "contentcoder/exports/"
 LATEST_APPLIED_CODES = CONTENTCODER_EXPORT_DIR + "applied_codes_2026_07_17.csv"
 LATEST_CODEBOOK = CONTENTCODER_EXPORT_DIR + "codebook_2026_07_17.csv"
+LATEST_CHARACTERISTICS = CONTENTCODER_EXPORT_DIR + "document_characteristics_2026_07_24.xlsx"
 
 # Legacy Dedoose exports (pre-ContentCoder; kept for archival reference only)
 LATEST_CHART_EXPORT = DATA_DIR + "raw/Dedoose Exports/DedooseChartExcerpts_2025_8_6_853.xlsx"
