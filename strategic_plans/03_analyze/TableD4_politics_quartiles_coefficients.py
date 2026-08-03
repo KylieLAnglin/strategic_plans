@@ -8,7 +8,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 # ---------------- Config ----------------
-NORMALIZED = True  # flip to False to use raw topic prevalences
+NORMALIZED = True  # flip False for raw prevalence
 
 # ---------------- Helpers ----------------
 def starify(p):
@@ -26,17 +26,16 @@ print(f"Analyzing {len(top_topics_df)} topics")
 print(f"Number of districts: {len(merge_df)}")
 print(f"Number of states: {merge_df['state'].nunique()}")
 
-# Scale percentage to 0–100 if needed
-merge_df["percent_race_black_hispanic"] = merge_df["percent_race_black_hispanic"] * 100
+# Scale to 0–100
+merge_df["district_pct_trump"] = merge_df["district_pct_trump"] * 100
 
-# ---------------- Demographic quartiles ----------------
-merge_df['demographic_quartile'] = pd.qcut(
-    merge_df['percent_race_black_hispanic'],
-    q=4, labels=['Q1', 'Q2', 'Q3', 'Q4']
+# ---------------- Politics quartiles ----------------
+merge_df['politics_quartile'] = pd.qcut(
+    merge_df['district_pct_trump'], q=4, labels=['Q1', 'Q2', 'Q3', 'Q4']
 )
 
-print("\nDemographic Quartiles (% Black/Hispanic):")
-quartile_stats = merge_df.groupby('demographic_quartile')['percent_race_black_hispanic'].agg(['min', 'max', 'mean', 'count'])
+print("\nPolitical Quartiles (% Trump Vote):")
+quartile_stats = merge_df.groupby('politics_quartile')['district_pct_trump'].agg(['min', 'max', 'mean', 'count'])
 for q in ['Q1', 'Q2', 'Q3', 'Q4']:
     s = quartile_stats.loc[q]
     print(f"{q}: {s['min']:.1f}% - {s['max']:.1f}% (mean: {s['mean']:.1f}%, n={int(s['count'])})")
@@ -60,7 +59,7 @@ quartile_levels = ["Q2", "Q3", "Q4"]  # Q1 is reference
 # ---------------- Workbook ----------------
 wb = Workbook()
 ws = wb.active
-ws.title = "Demographic Coefficients (State FE)"
+ws.title = "Politics Coefficients (State FE)"
 headers = ["Topic", "Q1 Mean", "Q2", "Q3", "Q4", "Unadj P-value", "Adj P-value"]
 for c, h in enumerate(headers, 1):
     ws.cell(row=1, column=c, value=h).font = Font(bold=True)
@@ -72,29 +71,28 @@ topic_results = []
 for topic_code in ordered_topics:
     topic_name = topic_label(topic_code, top_topics_df)
 
-    # Q1 as explicit reference; include state FE
     formula = (
-        f"{topic_code} ~ C(demographic_quartile, Treatment(reference='Q1')) "
+        f"{topic_code} ~ C(politics_quartile, Treatment(reference='Q1')) "
         f"+ C(state) + improvement_plan + form_plan + word_count"
     )
     model = smf.ols(formula, data=merge_df, missing='drop').fit()
 
-    q1_mean = merge_df.loc[merge_df['demographic_quartile'] == 'Q1', topic_code].mean()
+    q1_mean = merge_df.loc[merge_df['politics_quartile'] == 'Q1', topic_code].mean()
 
     coefficients = {
-        lvl: model.params.get(f"C(demographic_quartile, Treatment(reference='Q1'))[T.{lvl}]", np.nan)
+        lvl: model.params.get(f"C(politics_quartile, Treatment(reference='Q1'))[T.{lvl}]", np.nan)
         for lvl in quartile_levels
     }
     std_errors = {
-        lvl: model.bse.get(f"C(demographic_quartile, Treatment(reference='Q1'))[T.{lvl}]", np.nan)
+        lvl: model.bse.get(f"C(politics_quartile, Treatment(reference='Q1'))[T.{lvl}]", np.nan)
         for lvl in quartile_levels
     }
 
     # Explicit joint F-test
     f_test = model.f_test(
-        "C(demographic_quartile, Treatment(reference='Q1'))[T.Q2] = 0, "
-        "C(demographic_quartile, Treatment(reference='Q1'))[T.Q3] = 0, "
-        "C(demographic_quartile, Treatment(reference='Q1'))[T.Q4] = 0"
+        "C(politics_quartile, Treatment(reference='Q1'))[T.Q2] = 0, "
+        "C(politics_quartile, Treatment(reference='Q1'))[T.Q3] = 0, "
+        "C(politics_quartile, Treatment(reference='Q1'))[T.Q4] = 0"
     )
     p_value = float(f_test.pvalue)
 
@@ -129,10 +127,10 @@ for group_name, topics in TOPIC_GROUPS:
     current_row += 1 + (len(topics) * 2)
 
 # ---------------- Notes & Save ----------------
-ws.cell(row=current_row + 1, column=1, value="Note: Q1 (lowest % Black/Hispanic) is the reference category").font = Font(italic=True)
+ws.cell(row=current_row + 1, column=1, value="Note: Q1 (lowest % Trump vote) is the reference category").font = Font(italic=True)
 if NORMALIZED:
     ws.cell(row=current_row + 2, column=1, value="Prevalence values normalized by sum of included topics").font = Font(italic=True)
 
-output_path = start.RESULTS_DIR + 'Table8_demographic_quartiles_coefficients.xlsx'
+output_path = start.RESULTS_DIR + 'TableD4_politics_quartiles_coefficients.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")

@@ -50,7 +50,7 @@ def fit_contrast(data, outcome, group_variable, reference, comparison,
     Estimate comparison minus reference.
 
     Returns the contrast, standard error, unadjusted p-value,
-    confidence interval, and model N.
+    confidence interval, model N, and the reference group's raw mean.
     """
     group_term = (
         f"C({group_variable}, Treatment(reference='{reference}'))"
@@ -87,6 +87,11 @@ def fit_contrast(data, outcome, group_variable, reference, comparison,
         ci_low = np.nan
         ci_high = np.nan
 
+    reference_mean = data.loc[
+        data[group_variable] == reference,
+        outcome
+    ].mean()
+
     return {
         "estimate": estimate,
         "standard_error": standard_error,
@@ -94,6 +99,7 @@ def fit_contrast(data, outcome, group_variable, reference, comparison,
         "ci_low": ci_low,
         "ci_high": ci_high,
         "n": int(model.nobs),
+        "reference_mean": reference_mean,
     }
 
 
@@ -270,6 +276,7 @@ results["estimate_pp"] = results["estimate"] * 100
 results["standard_error_pp"] = results["standard_error"] * 100
 results["ci_low_pp"] = results["ci_low"] * 100
 results["ci_high_pp"] = results["ci_high"] * 100
+results["reference_mean_pp"] = results["reference_mean"] * 100
 
 
 # ---------------- Workbook ----------------
@@ -439,6 +446,7 @@ details_ws = wb.create_sheet("Underlying Estimates")
 detail_columns = [
     "topic_name",
     "contrast",
+    "reference_mean_pp",
     "estimate_pp",
     "standard_error_pp",
     "ci_low_pp",

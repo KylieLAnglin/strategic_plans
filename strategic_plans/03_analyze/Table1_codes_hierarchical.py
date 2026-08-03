@@ -6,6 +6,8 @@
       node followed by its children, siblings sorted by prevalence
     - Prevalence uses each node's level aggregate column from
       plans_codes.csv (the node's own code or anything nested under it)
+    - Reports prevalence for all plans and for the subset of plans that
+      are neither improvement plans nor standardized form plans
     - Excludes the Student Subgroups family
     - Outputs: results/hierarchical_prevalence.xlsx (APA-formatted sheet
       'Table 1' with every node in one table and an indented stub column;
@@ -24,6 +26,15 @@ EXCLUDED_FAMILY = "Student subgroups"
 df = pd.read_csv(start.DATA_DIR + "clean/plans_codes.csv")
 codebook_df = pd.read_csv(start.LATEST_CODEBOOK)
 number_plans = df.leaid.nunique()
+
+# Plan-type labels (improvement plan, standardized form plan) come from the
+# labelled sample file, the same source the TableD regressions use
+labelled_plans_df = pd.read_excel(start.DATA_DIR + "clean/sample_inclusion_with_topics_labeled.xlsx")
+df = df.merge(labelled_plans_df[["leaid", "improvement_plan", "form_plan"]], on="leaid", how="left")
+
+is_non_standardized_non_improvement = (df.improvement_plan == 0) & (df.form_plan == 0)
+number_non_standardized_non_improvement = int(is_non_standardized_non_improvement.sum())
+print(f"{number_non_standardized_non_improvement} plans are neither improvement plans nor standardized form plans")
 
 # %% Select the nodes for the table
 # Drop the excluded family (the node itself and everything nested under it)
@@ -54,6 +65,13 @@ table_codebook["count_plans"] = table_codebook.node_column.map(
 )
 table_codebook["proportion"] = table_codebook.count_plans / number_plans
 
+table_codebook["count_non_standardized_non_improvement"] = table_codebook.node_column.map(
+    df.loc[is_non_standardized_non_improvement, table_codebook.node_column].sum()
+)
+table_codebook["proportion_non_standardized_non_improvement"] = (
+    table_codebook.count_non_standardized_non_improvement / number_non_standardized_non_improvement
+)
+
 # %% Order rows as a tree: parents first, siblings by prevalence
 # Sort keys per level: the count of the row's ancestor at that level (so
 # subtrees stay together, highest-prevalence first), with blank levels
@@ -82,6 +100,9 @@ for level_number in range(1, max_level + 1):
     )
 hierarchical_table["count_plans"] = table_codebook.count_plans.astype(int)
 hierarchical_table["proportion"] = table_codebook.proportion
+hierarchical_table["proportion_non_standardized_non_improvement"] = (
+    table_codebook.proportion_non_standardized_non_improvement
+)
 hierarchical_table["variable"] = table_codebook.node_column
 
 # %% Build the APA-formatted sheet
@@ -98,7 +119,9 @@ rule_above_and_below = Border(top=Side(style="thin"), bottom=Side(style="thin"))
 table_note = (
     f"Note. N = {number_plans} district strategic plans. Prevalence for a "
     "higher-level goal reflects plans in which that goal or any goal nested "
-    "under it was applied. Student subgroup codes are excluded."
+    "under it was applied. Student subgroup codes are excluded. The final "
+    f"column restricts to the {number_non_standardized_non_improvement} plans that are "
+    "neither improvement plans nor standardized form plans."
 )
 
 workbook = Workbook()
@@ -114,7 +137,10 @@ header_row = 4
 apa_sheet.cell(row=header_row, column=1, value="Goal")
 apa_sheet.cell(row=header_row, column=2, value="n")
 apa_sheet.cell(row=header_row, column=3, value="Proportion")
-for column_number in [1, 2, 3]:
+apa_sheet.cell(
+    row=header_row, column=4, value="Proportion, non-standardized, non-improvement plans"
+)
+for column_number in [1, 2, 3, 4]:
     header_cell = apa_sheet.cell(row=header_row, column=column_number)
     header_cell.font = apa_italic_font if column_number == 2 else apa_base_font
     header_cell.border = rule_above_and_below
@@ -133,9 +159,15 @@ for row_offset, (_, node_row) in enumerate(table_codebook.iterrows()):
     proportion_cell.font = apa_base_font
     proportion_cell.alignment = Alignment(horizontal="center")
     proportion_cell.number_format = "#.00"  # APA: no leading zero on proportions
+    other_proportion_cell = apa_sheet.cell(
+        row=excel_row, column=4, value=float(node_row.proportion_non_standardized_non_improvement)
+    )
+    other_proportion_cell.font = apa_base_font
+    other_proportion_cell.alignment = Alignment(horizontal="center")
+    other_proportion_cell.number_format = "#.00"
 
 last_body_row = body_start_row + len(table_codebook) - 1
-for column_number in [1, 2, 3]:
+for column_number in [1, 2, 3, 4]:
     apa_sheet.cell(row=last_body_row, column=column_number).border = rule_below
 
 note_cell = apa_sheet.cell(row=last_body_row + 2, column=1)
@@ -146,6 +178,7 @@ note_cell.alignment = Alignment(horizontal="left", wrap_text=True)
 apa_sheet.column_dimensions["A"].width = 58
 apa_sheet.column_dimensions["B"].width = 8
 apa_sheet.column_dimensions["C"].width = 12
+apa_sheet.column_dimensions["D"].width = 22
 
 # %% Export (APA sheet plus a raw data sheet)
 data_sheet = workbook.create_sheet("data")

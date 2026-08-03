@@ -116,6 +116,6 @@ ws.cell(row=current_row + 1, column=1, value="Note: Northeast is the reference c
 if NORMALIZED:
     ws.cell(row=current_row + 2, column=1, value="Prevalence values normalized by sum of included topics").font = Font(italic=True)
 
-output_path = start.RESULTS_DIR + 'Table7_regions_topics_coefficients.xlsx'
+output_path = start.RESULTS_DIR + 'TableD2_regions_topics_coefficients.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")

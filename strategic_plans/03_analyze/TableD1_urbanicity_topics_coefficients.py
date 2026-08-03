@@ -106,6 +106,6 @@ for group_name, topics in TOPIC_GROUPS:
     current_row += 1 + (len(topics) * 2)
 
 # ---------------- Save ----------------
-output_path = start.RESULTS_DIR + 'Table6_urbanicity_topics_coefficients.xlsx'
+output_path = start.RESULTS_DIR + 'TableD1_urbanicity_topics_coefficients.xlsx'
 wb.save(output_path)
 print(f"\nTable exported to {output_path}")
